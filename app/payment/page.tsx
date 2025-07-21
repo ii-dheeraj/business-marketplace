@@ -32,13 +32,22 @@ import Image from "next/image"
 import { useSearchParams } from "next/navigation"
 
 interface OrderDetails {
+  id: number
+  orderNumber: string
   items: any[]
-  customerDetails: any
+  customerName: string
+  customerPhone: string
+  customerAddress: string
+  customerCity: string
+  customerArea: string
+  customerLocality?: string
   subtotal: number
   deliveryFee: number
-  total: number
-  orderId: string
-  orderDate: string
+  totalAmount: number
+  orderStatus: string
+  paymentStatus: string
+  paymentMethod: string
+  createdAt: string
 }
 
 export default function PaymentPage() {
@@ -66,6 +75,8 @@ export default function PaymentPage() {
   const [walletUtr, setWalletUtr] = useState("")
 
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const orderId = searchParams.get("orderId")
   const merchantUpiId = "merchant@paytm"
 
   useEffect(() => {
@@ -113,7 +124,7 @@ export default function PaymentPage() {
   }
 
   const placeOrder = async () => {
-    if (!selectedPaymentMethod || !orderDetails) return
+    if (!selectedPaymentMethod || !orderDetails || !orderId) return
     if (["upi_online", "card", "netbanking", "wallet"].includes(selectedPaymentMethod) && !validatePaymentDetails()) {
       alert("Please fill in all required payment details")
       return
@@ -259,25 +270,17 @@ export default function PaymentPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="text-2xl font-bold text-blue-600 mr-6">
-                LocalMarket
-              </Link>
-              <span className="text-gray-500">Payment</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-600">SSL Secured</span>
-            </div>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center">
+            <span className="text-gray-500 text-lg font-medium">Payment</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-green-600" />
+            <span className="text-sm text-green-600">SSL Secured</span>
           </div>
         </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Payment Methods */}
           <div className="lg:col-span-2 space-y-6">
@@ -376,7 +379,7 @@ export default function PaymentPage() {
                           </div>
                         </div>
                         <div className="mt-3 p-3 bg-white rounded-lg border">
-                          <p className="text-lg font-semibold text-purple-600">₹{orderDetails.total}</p>
+                          <p className="text-lg font-semibold text-purple-600">₹{orderDetails.totalAmount}</p>
                           <p className="text-xs text-gray-500">Amount to Pay</p>
                         </div>
                       </div>
@@ -419,7 +422,7 @@ export default function PaymentPage() {
                           <h5 className="font-medium text-blue-800 mb-2">Payment Steps:</h5>
                           <ol className="text-sm text-blue-700 space-y-1">
                             <li>1. Scan QR code or copy UPI ID</li>
-                            <li>2. Pay ₹{orderDetails.total} using your UPI app</li>
+                            <li>2. Pay ₹{orderDetails.totalAmount} using your UPI app</li>
                             <li>3. Copy the UTR number from payment confirmation</li>
                             <li>4. Enter UTR number above and place order</li>
                           </ol>
@@ -482,7 +485,7 @@ export default function PaymentPage() {
                             <div className="w-12 h-8 bg-yellow-400 rounded"></div>
                             <div className="text-right">
                               <p className="text-xs opacity-75">Amount</p>
-                              <p className="text-xl font-bold">₹{orderDetails.total}</p>
+                              <p className="text-xl font-bold">₹{orderDetails.totalAmount}</p>
                             </div>
                           </div>
                           <div className="space-y-2">
@@ -612,7 +615,7 @@ export default function PaymentPage() {
                           <Globe className="h-16 w-16 mx-auto text-orange-600 mb-2" />
                           <p className="text-sm text-gray-600 mb-2">Secure Bank Transfer</p>
                           <div className="bg-orange-100 p-3 rounded">
-                            <p className="text-lg font-semibold text-orange-600">₹{orderDetails.total}</p>
+                            <p className="text-lg font-semibold text-orange-600">₹{orderDetails.totalAmount}</p>
                             <p className="text-xs text-gray-500">Amount to Pay</p>
                           </div>
                         </div>
@@ -708,7 +711,7 @@ export default function PaymentPage() {
                           <CardIcon className="h-16 w-16 mx-auto text-pink-600 mb-2" />
                           <p className="text-sm text-gray-600 mb-2">Quick Wallet Payment</p>
                           <div className="bg-pink-100 p-3 rounded">
-                            <p className="text-lg font-semibold text-pink-600">₹{orderDetails.total}</p>
+                            <p className="text-lg font-semibold text-pink-600">₹{orderDetails.totalAmount}</p>
                             <p className="text-xs text-gray-500">Amount to Pay</p>
                           </div>
                         </div>
@@ -822,18 +825,18 @@ export default function PaymentPage() {
                   {orderDetails.items.map((item) => (
                     <div key={item.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                       <Image
-                        src={item.image || "/placeholder.svg"}
-                        alt={item.name}
+                        src={item.productImage || "/placeholder.svg"}
+                        alt={item.productName}
                         width={40}
                         height={40}
                         className="rounded-md object-cover"
                       />
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm truncate">{item.name}</h4>
-                        <p className="text-xs text-gray-500 truncate">{item.sellerName}</p>
+                        <h4 className="font-medium text-sm truncate">{item.productName}</h4>
+                        <p className="text-xs text-gray-500 truncate">{item.productCategory || "General"}</p>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-xs text-gray-500">Qty: {item.quantity}</span>
-                          <span className="text-sm font-semibold text-green-600">₹{item.price * item.quantity}</span>
+                          <span className="text-sm font-semibold text-green-600">₹{item.totalPrice}</span>
                         </div>
                       </div>
                     </div>
@@ -863,11 +866,11 @@ export default function PaymentPage() {
                   <Separator />
                   <div className="flex justify-between font-semibold text-lg">
                     <span>Total</span>
-                    <span className="text-green-600">₹{orderDetails.total}</span>
+                    <span className="text-green-600">₹{orderDetails.totalAmount}</span>
                   </div>
                   {(selectedPaymentMethod === "cod" || selectedPaymentMethod === "upi_on_delivery") && (
                     <p className="text-xs text-green-600 text-center">
-                      Pay ₹{orderDetails.total} {selectedPaymentMethod === "cod" ? "in cash" : "via UPI"} on delivery
+                      Pay ₹{orderDetails.totalAmount} {selectedPaymentMethod === "cod" ? "in cash" : "via UPI"} on delivery
                     </p>
                   )}
                 </div>
@@ -876,14 +879,13 @@ export default function PaymentPage() {
                 <div className="pt-4 border-t">
                   <h4 className="font-medium text-sm mb-2">Delivery Address</h4>
                   <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                    <p className="font-medium text-gray-900">{orderDetails.customerDetails.name}</p>
-                    <p>{orderDetails.customerDetails.address}</p>
-                    {orderDetails.customerDetails.address2 && <p>{orderDetails.customerDetails.address2}</p>}
+                    <p className="font-medium text-gray-900">{orderDetails.customerName}</p>
+                    <p>{orderDetails.customerAddress}</p>
                     <p>
-                      {orderDetails.customerDetails.city}, {orderDetails.customerDetails.state}{" "}
-                      {orderDetails.customerDetails.pincode}
+                      {orderDetails.customerCity}, {orderDetails.customerArea}{" "}
+                      {orderDetails.customerLocality && orderDetails.customerLocality}
                     </p>
-                    <p className="mt-1 text-blue-600">{orderDetails.customerDetails.phone}</p>
+                    <p className="mt-1 text-blue-600">{orderDetails.customerPhone}</p>
                   </div>
                 </div>
 
@@ -929,7 +931,7 @@ export default function PaymentPage() {
                       ) : (
                         <>
                           <CheckCircle className="h-4 w-4 mr-2" />
-                          Pay ₹{orderDetails.total}
+                          Pay ₹{orderDetails.totalAmount}
                         </>
                       )}
                     </>

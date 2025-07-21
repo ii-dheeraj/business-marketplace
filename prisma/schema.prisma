@@ -11,66 +11,294 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY_FOR_DELIVERY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum TrackingStatus {
+  ORDER_PLACED
+  ORDER_CONFIRMED
+  PREPARING_ORDER
+  READY_FOR_PICKUP
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH_ON_DELIVERY
+  ONLINE_PAYMENT
+  WALLET
+}
+
+// Customer table
+model Customer {
   id        Int      @id @default(autoincrement())
   name      String
   email     String   @unique
   phone     String?
   password  String
-  userType  String
-  category  String?  // Business category
-  city      String?  // Business city
-  area      String?  // Business area
-  locality  String?  // Business locality
-  address   String?  // Business address
-  promoted  Boolean  @default(false) // Promoted business
+  avatar    String?
+  
+  // Common fields
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  // Relations
   orders    Order[]
-  products  Product[] // Relation to products sold by the user
+  payments  Payment[]
 }
 
+// Seller table
+model Seller {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String
+  avatar    String?
+  
+  // Business specific fields
+  businessName    String
+  category        String  // Main business category (single selection)
+  subcategories   String  // JSON array of subcategories (multiple selection)
+  businessAddress String
+  businessCity    String
+  businessArea    String?
+  businessLocality String?
+  businessDescription String?
+  businessImage   String?
+  isVerified      Boolean @default(false)
+  isPromoted      Boolean @default(false)
+  rating          Float   @default(0)
+  totalReviews    Int     @default(0)
+  deliveryTime    String?
+  isOpen          Boolean @default(true)
+  
+  // Common fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  products     Product[]
+  sellerOrders SellerOrder[]
+}
+
+// Delivery Agent table
+model DeliveryAgent {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String
+  avatar    String?
+  
+  // Delivery specific fields
+  vehicleNumber   String
+  vehicleType     String
+  isAvailable     Boolean @default(true)
+  currentLocation String?
+  
+  // Common fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  deliveryOrders Order[] @relation("DeliveryAgent")
+}
+
+// Product table for sellers
 model Product {
   id          Int      @id @default(autoincrement())
   name        String
   description String?
   price       Float
+  originalPrice Float?
   image       String?
-  category    String?  // Product category
+  category    String?
+  subcategory String?
+  stock       Int      @default(0)
+  inStock     Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  
+  // Seller relation
   sellerId    Int
-  seller      User     @relation(fields: [sellerId], references: [id])
+  seller      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  // Relations
   orderItems  OrderItem[]
 }
 
+// Order table for customer orders
 model Order {
   id              Int         @id @default(autoincrement())
-  buyerId         Int
-  buyer           User        @relation(fields: [buyerId], references: [id])
+  orderNumber     String      @unique
+  
+  // Customer who placed the order
+  customerId      Int
+  customer        Customer    @relation(fields: [customerId], references: [id])
+  
+  // Delivery agent assigned to the order
+  deliveryAgentId Int?
+  deliveryAgent   DeliveryAgent? @relation("DeliveryAgent", fields: [deliveryAgentId], references: [id])
+  
+  // Order details
   items           OrderItem[]
-  customerDetails Json
-  paymentMethod   String
-  paymentStatus   String
-  transactionStatus String
-  orderStatus     String
-  totalAmount     Float
+  orderStatus     OrderStatus @default(PENDING)
+  
+  // Customer details
+  customerName    String
+  customerPhone   String
+  customerAddress String
+  customerCity    String
+  customerArea    String
+  customerLocality String?
+  
+  // Amount details
   subtotal        Float
   deliveryFee     Float
-  paymentDetails  Json?
-  imageProof      Json?
+  taxAmount       Float       @default(0)
+  totalAmount     Float
+  
+  // Payment details
+  paymentMethod   PaymentMethod
+  paymentStatus   PaymentStatus @default(PENDING)
+  
+  // Delivery details
+  deliveryInstructions String?
+  estimatedDeliveryTime DateTime?
+  actualDeliveryTime    DateTime?
+  
+  // Timestamps
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  
+  // Relations
+  sellerOrders    SellerOrder[]
+  payments        Payment[]
+  tracking        OrderTracking[]
 }
 
+// Order items within an order
 model OrderItem {
   id        Int     @id @default(autoincrement())
-  order     Order   @relation(fields: [orderId], references: [id])
+  
+  // Order relation
   orderId   Int
-  product   Product @relation(fields: [productId], references: [id])
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Product relation
   productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  
+  // Item details
   quantity  Int
-  price     Float
-  name      String
-  image     String?
+  unitPrice Float
+  totalPrice Float
+  
+  // Product snapshot (in case product gets deleted/modified)
+  productName String
+  productImage String?
+  productCategory String?
+}
+
+// Seller Orders table to track orders for each seller
+model SellerOrder {
+  id        Int         @id @default(autoincrement())
+  
+  // Order relation
+  orderId   Int
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Seller relation
+  sellerId  Int
+  seller    Seller      @relation(fields: [sellerId], references: [id])
+  
+  // Seller order status
+  status    OrderStatus @default(PENDING)
+  
+  // Seller specific details
+  items     Json        // Array of order items for this seller
+  subtotal  Float
+  commission Float      @default(0)
+  netAmount Float
+  
+  // Timestamps
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  
+  @@unique([orderId, sellerId])
+}
+
+// Payment table to track all payments
+model Payment {
+  id            Int           @id @default(autoincrement())
+  paymentId     String        @unique
+  
+  // Order relation
+  orderId       Int
+  order         Order         @relation(fields: [orderId], references: [id])
+  
+  // Customer relation (who made the payment)
+  customerId    Int
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  
+  // Payment details
+  amount        Float
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus @default(PENDING)
+  
+  // Transaction details
+  transactionId String?
+  gateway       String?
+  gatewayResponse Json?
+  
+  // Timestamps
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+// Order tracking for real-time updates
+model OrderTracking {
+  id          Int           @id @default(autoincrement())
+  orderId     Int
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status      TrackingStatus
+  description String
+  location    String?
+  createdAt   DateTime      @default(now())
+  
+  @@index([orderId])
+}
+
+// Chat messages for customer-seller communication
+model ChatMessage {
+  id          Int      @id @default(autoincrement())
+  senderId    String   // Can be customer or seller ID
+  senderType  String   // "customer" or "seller"
+  receiverId  String   // Can be customer or seller ID
+  receiverType String  // "customer" or "seller"
+  message     String
+  orderId     Int?     // Optional: link to specific order
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

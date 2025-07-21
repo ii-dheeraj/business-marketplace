@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { User, Mail, Phone, MapPin, Store, Truck, Edit, Save, LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { getCookie, removeCookie } from "@/lib/utils"
+import { getCookie, deleteCookie } from "@/lib/utils"
 
 export default function ProfilePage() {
   const [userInfo, setUserInfo] = useState<any>(null)
@@ -70,7 +70,7 @@ export default function ProfilePage() {
   }
 
   const handleLogout = () => {
-    removeCookie("userInfo")
+            deleteCookie("userInfo")
     router.push("/")
   }
 
@@ -102,24 +102,15 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="text-2xl font-bold text-blue-600">
-              LocalMarket
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
         <Card>
           <CardHeader className="text-center">
             <div className="mx-auto w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">

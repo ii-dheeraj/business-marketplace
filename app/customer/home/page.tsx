@@ -27,7 +27,7 @@ import Image from "next/image"
 import { CartDrawer } from "@/components/cart-drawer"
 import { useCart } from "@/hooks/useCart"
 import { useLocation } from "@/hooks/useLocation"
-import { getCookie, removeCookie } from "@/lib/utils"
+import { getCookie, deleteCookie } from "@/lib/utils"
 
 // Location data
 const locationData = {
@@ -78,230 +78,7 @@ const locationData = {
   },
 }
 
-// Enhanced business data with multiple cities
-const businessesData = [
-  // Bangalore businesses
-  {
-    id: 1,
-    name: "Sharma Electronics",
-    category: "Electronics",
-    rating: 4.5,
-    reviews: 234,
-    deliveryTime: "30-45 min",
-    image: "/placeholder.svg?height=200&width=300",
-    city: "Bangalore",
-    area: "Koramangala",
-    locality: "5th Block",
-    promoted: true,
-    products: [
-      {
-        id: "p1",
-        name: "Wireless Headphones",
-        price: 2999,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-      {
-        id: "p2",
-        name: "Smartphone Case",
-        price: 599,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: "Fresh Mart Grocery",
-    category: "Grocery",
-    rating: 4.2,
-    reviews: 156,
-    deliveryTime: "20-30 min",
-    image: "/placeholder.svg?height=200&width=300",
-    city: "Bangalore",
-    area: "HSR Layout",
-    locality: "Sector 2",
-    promoted: false,
-    products: [
-      {
-        id: "p3",
-        name: "Organic Apples",
-        price: 180,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-      {
-        id: "p4",
-        name: "Fresh Milk",
-        price: 60,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-    ],
-  },
-  {
-    id: 3,
-    name: "Style Hub Fashion",
-    category: "Fashion",
-    rating: 4.3,
-    reviews: 89,
-    deliveryTime: "45-60 min",
-    image: "/placeholder.svg?height=200&width=300",
-    city: "Bangalore",
-    area: "Indiranagar",
-    locality: "100 Feet Road",
-    promoted: true,
-    products: [
-      {
-        id: "p5",
-        name: "Cotton T-Shirt",
-        price: 899,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-      {
-        id: "p6",
-        name: "Denim Jeans",
-        price: 1999,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-    ],
-  },
-  // Mumbai businesses
-  {
-    id: 4,
-    name: "Mumbai Electronics Hub",
-    category: "Electronics",
-    rating: 4.4,
-    reviews: 312,
-    deliveryTime: "25-40 min",
-    image: "/placeholder.svg?height=200&width=300",
-    city: "Mumbai",
-    area: "Bandra",
-    locality: "Bandra West",
-    promoted: true,
-    products: [
-      {
-        id: "p7",
-        name: "Bluetooth Speaker",
-        price: 3499,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-      {
-        id: "p8",
-        name: "Power Bank",
-        price: 1299,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-    ],
-  },
-  {
-    id: 5,
-    name: "Andheri Fresh Foods",
-    category: "Grocery",
-    rating: 4.1,
-    reviews: 198,
-    deliveryTime: "30-45 min",
-    image: "/placeholder.svg?height=200&width=300",
-    city: "Mumbai",
-    area: "Andheri",
-    locality: "Andheri West",
-    promoted: false,
-    products: [
-      {
-        id: "p9",
-        name: "Basmati Rice",
-        price: 450,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-      {
-        id: "p10",
-        name: "Cooking Oil",
-        price: 280,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-    ],
-  },
-  // Delhi businesses
-  {
-    id: 6,
-    name: "Delhi Tech Store",
-    category: "Electronics",
-    rating: 4.6,
-    reviews: 445,
-    deliveryTime: "20-35 min",
-    image: "/placeholder.svg?height=200&width=300",
-    city: "Delhi",
-    area: "Connaught Place",
-    locality: "Inner Circle",
-    promoted: true,
-    products: [
-      {
-        id: "p11",
-        name: "Gaming Mouse",
-        price: 2199,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-      {
-        id: "p12",
-        name: "USB Cable",
-        price: 299,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-    ],
-  },
-  // Chennai businesses
-  {
-    id: 7,
-    name: "Chennai Spice Market",
-    category: "Grocery",
-    rating: 4.3,
-    reviews: 267,
-    deliveryTime: "25-40 min",
-    image: "/placeholder.svg?height=200&width=300",
-    city: "Chennai",
-    area: "T Nagar",
-    locality: "Pondy Bazaar",
-    promoted: false,
-    products: [
-      {
-        id: "p13",
-        name: "South Indian Spices",
-        price: 350,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-      {
-        id: "p14",
-        name: "Coconut Oil",
-        price: 420,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-    ],
-  },
-  // Hyderabad businesses
-  {
-    id: 8,
-    name: "Hyderabad Fashion Plaza",
-    category: "Fashion",
-    rating: 4.2,
-    reviews: 178,
-    deliveryTime: "35-50 min",
-    image: "/placeholder.svg?height=200&width=300",
-    city: "Hyderabad",
-    area: "Hitech",
-    locality: "Madhapur",
-    promoted: true,
-    products: [
-      {
-        id: "p15",
-        name: "Ethnic Kurta",
-        price: 1599,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-      {
-        id: "p16",
-        name: "Designer Saree",
-        price: 4999,
-        image: "/placeholder.svg?height=150&width=150",
-      },
-    ],
-  },
-]
+
 
 export default function CustomerHomePage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -328,7 +105,7 @@ export default function CustomerHomePage() {
     if (userInfoCookie) {
       try {
         const user = JSON.parse(userInfoCookie)
-        if (user.userType !== "customer") {
+        if (user.userType !== "CUSTOMER") {
           setCustomerInfo(null)
           router.push("/")
           return
@@ -384,13 +161,16 @@ export default function CustomerHomePage() {
   }
 
   const handleSearch = () => {
+    console.log("[DEBUG] Search triggered with query:", searchQuery)
     const params = new URLSearchParams()
     if (searchQuery) params.set("q", searchQuery)
     if (location.selectedCity) params.set("city", location.selectedCity)
     if (location.selectedArea && location.selectedArea !== "All Areas") params.set("area", location.selectedArea)
     if (location.selectedLocality) params.set("locality", location.selectedLocality)
 
-    router.push(`/browse?${params.toString()}`)
+    const searchUrl = `/browse?${params.toString()}`
+    console.log("[DEBUG] Navigating to:", searchUrl)
+    router.push(searchUrl)
   }
 
   const handleAddToCart = (business: any, product: any) => {
@@ -405,7 +185,7 @@ export default function CustomerHomePage() {
   }
 
   const handleLogout = () => {
-    removeCookie("userInfo")
+            deleteCookie("userInfo")
     router.push("/")
   }
 
@@ -431,28 +211,6 @@ export default function CustomerHomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-          <div className="flex items-center">
-            <Link href="/customer/home" className="text-2xl font-bold text-blue-600 mr-6">
-              LocalMarket
-            </Link>
-            <span className="text-gray-500">Customer Home</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/customer/orders">
-              <Button variant="outline" size="sm">
-                My Orders
-              </Button>
-            </Link>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
-
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-blue-600 to-purple-700 text-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -516,15 +274,16 @@ export default function CustomerHomePage() {
                           Clear
                         </Button>
                       </div>
-                      {(
-                        locationData[location.selectedCity as keyof typeof locationData]?.areas[
-                          location.selectedArea as keyof (typeof locationData)[keyof typeof locationData]["areas"]
-                        ] || []
-                      ).map((locality: string) => (
-                        <DropdownMenuItem key={locality} onClick={() => handleLocalityChange(locality)}>
-                          {locality}
-                        </DropdownMenuItem>
-                      ))}
+                      {(() => {
+                        const cityData = locationData[location.selectedCity as keyof typeof locationData];
+                        const areaData = cityData?.areas[location.selectedArea as keyof typeof cityData.areas];
+                        const localities: string[] = areaData || [];
+                        return localities.map((locality: string) => (
+                          <DropdownMenuItem key={locality} onClick={() => handleLocalityChange(locality)}>
+                            {locality}
+                          </DropdownMenuItem>
+                        ));
+                      })()}
                     </>
                   )}
                 </DropdownMenuContent>
@@ -534,11 +293,17 @@ export default function CustomerHomePage() {
                 <Input
                   placeholder="Search for businesses, products..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1"
+                  onChange={(e) => {
+                    console.log("[DEBUG] Search input changed to:", e.target.value)
+                    setSearchQuery(e.target.value)
+                  }}
+                  className="flex-1 text-gray-900 placeholder:text-gray-500 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   onKeyPress={(e) => e.key === "Enter" && handleSearch()}
                 />
-                <Button onClick={handleSearch} className="px-6">
+                <Button onClick={() => {
+                  console.log("[DEBUG] Search button clicked")
+                  handleSearch()
+                }} className="px-6">
                   <Search className="h-4 w-4" />
                 </Button>
               </div>

@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Package,
   ShoppingCart,
@@ -32,11 +33,12 @@ import {
   Settings,
   BarChart3,
   Store,
+  Save,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { getCookie, removeCookie } from "@/lib/utils"
+import { getCookie, deleteCookie } from "@/lib/utils"
 
 // Mock data for demonstration
 const mockProducts = [
@@ -86,11 +88,48 @@ export default function SellerDashboard() {
   const [sellerInfo, setSellerInfo] = useState<any>(null)
   const [activeTab, setActiveTab] = useState("products")
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false)
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false)
   const router = useRouter()
   const [orders, setOrders] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [editingProduct, setEditingProduct] = useState<any | null>(null)
   const [editForm, setEditForm] = useState<any>({})
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+
+  // Optimized data fetching with loading states
+  const fetchProducts = async (page = 1) => {
+    if (!sellerInfo) return
+    setIsLoadingProducts(true)
+    try {
+      const res = await fetch(`/api/product?sellerId=${sellerInfo.id}&page=${page}&limit=10`)
+      const data = await res.json()
+      console.log("Fetched products:", data.products)
+      setProducts(data.products || [])
+      setTotalPages(data.pagination?.totalPages || 1)
+      setCurrentPage(page)
+    } catch (error) {
+      console.error("Error fetching products:", error)
+    } finally {
+      setIsLoadingProducts(false)
+    }
+  }
+
+  const fetchOrders = async (page = 1) => {
+    if (!sellerInfo) return
+    setIsLoadingOrders(true)
+    try {
+      const res = await fetch(`/api/seller/orders?sellerId=${sellerInfo.id}&page=${page}&limit=10`)
+      const data = await res.json()
+      console.log("Fetched seller orders:", data.orders) // Debug log
+      setOrders(data.orders || [])
+    } catch (error) {
+      console.error("Error fetching orders:", error)
+    } finally {
+      setIsLoadingOrders(false)
+    }
+  }
 
   useEffect(() => {
     const userInfoCookie = getCookie("userInfo")
@@ -98,23 +137,6 @@ export default function SellerDashboard() {
       try {
         const user = JSON.parse(userInfoCookie)
         setSellerInfo(user)
-        // Fetch products for this seller
-        const fetchProducts = async () => {
-          const res = await fetch(`/api/product?sellerId=${user.id}`)
-          const data = await res.json()
-          setProducts(data.products || [])
-        }
-        fetchProducts()
-        // Fetch orders for this seller
-        const fetchOrders = async () => {
-          const res = await fetch("/api/order/place")
-          const data = await res.json()
-          const sellerOrders = (data.orders || []).filter((order: any) =>
-            order.items.some((item: any) => item.product && item.product.sellerId === user.id)
-          )
-          setOrders(sellerOrders)
-        }
-        fetchOrders()
       } catch {
         setSellerInfo(null)
         router.push("/auth/login")
@@ -126,37 +148,71 @@ export default function SellerDashboard() {
     setIsLoading(false)
   }, [router])
 
-  const handleLogout = () => {
-    removeCookie("userInfo")
-    router.push("/")
+  // Fetch data when sellerInfo is available
+  useEffect(() => {
+    if (sellerInfo && sellerInfo.id) {
+      fetchProducts(1)
+      fetchOrders(1)
+    }
+  }, [sellerInfo])
+
+  // Handle tab changes with optimized data loading
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab)
+    if (tab === "products" && products.length === 0) {
+      fetchProducts(1)
+    } else if (tab === "orders" && orders.length === 0) {
+      fetchOrders(1)
+    }
   }
 
+
+
   const handleEditProduct = (product: any) => {
+    console.log("Editing product:", product) // Debug log
+    const formData = { 
+      name: product.name || "",
+      description: product.description || "",
+      price: product.price || "",
+      stock: product.stock || 0,
+      image: product.image || "",
+      category: product.category || ""
+    }
+    console.log("Setting edit form data:", formData) // Debug log
     setEditingProduct(product)
-    setEditForm({ ...product })
+    setEditForm(formData)
   }
   const handleEditFormChange = (field: string, value: any) => {
     setEditForm((prev: any) => ({ ...prev, [field]: value }))
   }
   const handleSaveEdit = async () => {
     if (!editingProduct) return
+    
+    const updateData = {
+      id: editingProduct.id,
+      name: editForm.name,
+      description: editForm.description,
+      price: editForm.price,
+      stock: editForm.stock,
+      image: editForm.image,
+      category: editForm.category,
+    }
+    
+    console.log("Saving product with data:", updateData) // Debug log
+    
     const res = await fetch("/api/product", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: editingProduct.id,
-        name: editForm.name,
-        description: editForm.description,
-        price: editForm.price,
-        image: editForm.image,
-        category: editForm.category,
-      }),
+      body: JSON.stringify(updateData),
     })
     const data = await res.json()
     if (res.ok && data.product) {
+      console.log("Product updated successfully:", data.product) // Debug log
       setProducts((prev) => prev.map((p) => (p.id === data.product.id ? data.product : p)))
       setEditingProduct(null)
+      alert("Product updated successfully!")
     } else {
+      console.error("Failed to update product:", data) // Debug log
       alert(data.error || "Failed to update product")
     }
   }
@@ -235,35 +291,6 @@ export default function SellerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-          <div className="flex items-center space-x-4">
-            <Link href="/" className="text-xl sm:text-2xl font-bold text-blue-600">
-              LocalMarket
-            </Link>
-            <span className="hidden sm:inline text-gray-500">Seller Dashboard</span>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <Link href="/seller/orders">
-              <Button variant="outline" size="sm">
-                Order History
-              </Button>
-            </Link>
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <User className="h-4 w-4" />
-              <span className="text-sm text-gray-600 hidden sm:inline">
-                {sellerInfo.businessName || sellerInfo.name}
-              </span>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
-          </div>
-        </div>
-      </header>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Welcome Section */}
         <div className="mb-6 sm:mb-8">
@@ -324,7 +351,7 @@ export default function SellerDashboard() {
         </div>
 
         {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="products" className="text-xs sm:text-sm">
               <Package className="h-4 w-4 mr-1 sm:mr-2" />
@@ -381,7 +408,41 @@ export default function SellerDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {products.map((product) => (
+                      {isLoadingProducts ? (
+                        // Loading skeleton
+                        Array.from({ length: 5 }).map((_, index) => (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <div className="w-[50px] h-[50px] bg-gray-200 rounded-md animate-pulse"></div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="h-4 bg-gray-200 rounded animate-pulse w-24"></div>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">
+                              <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="h-4 bg-gray-200 rounded animate-pulse w-16"></div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              <div className="h-4 bg-gray-200 rounded animate-pulse w-12"></div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="h-6 bg-gray-200 rounded animate-pulse w-20"></div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="h-8 bg-gray-200 rounded animate-pulse w-8 ml-auto"></div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : products.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                            No products found. Add your first product to get started!
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        products.map((product) => (
                         <TableRow key={product.id}>
                           <TableCell>
                             <Image
@@ -395,9 +456,11 @@ export default function SellerDashboard() {
                           <TableCell className="font-medium">{product.name}</TableCell>
                           <TableCell className="hidden sm:table-cell">{product.category}</TableCell>
                           <TableCell>₹{product.price}</TableCell>
-                          <TableCell className="hidden md:table-cell">-</TableCell>
+                            <TableCell className="hidden md:table-cell">{product.stock || 0}</TableCell>
                           <TableCell>
-                            <Badge className={getStatusColor("active")}>active</Badge>
+                              <Badge className={getStatusColor(product.stock > 0 ? "active" : "out_of_stock")}>
+                                {product.stock > 0 ? "active" : "out of stock"}
+                              </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
@@ -407,7 +470,10 @@ export default function SellerDashboard() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditProduct(product)}>
+                                  <DropdownMenuItem onClick={() => {
+                                    console.log("Edit clicked for product:", product);
+                                    handleEditProduct(product);
+                                  }}>
                                   <Edit className="mr-2 h-4 w-4" />
                                   Edit
                                 </DropdownMenuItem>
@@ -419,12 +485,120 @@ export default function SellerDashboard() {
                             </DropdownMenu>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Pagination */}
+            {!isLoadingProducts && totalPages > 1 && (
+              <div className="flex justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchProducts(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="flex items-center px-3 text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchProducts(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+
+            {/* Edit Product Modal */}
+            <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Edit Product - {editingProduct?.name}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-name">Product Name</Label>
+                      <Input
+                        id="edit-name"
+                        value={editForm.name || ""}
+                        onChange={(e) => handleEditFormChange("name", e.target.value)}
+                        placeholder="Product name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-category">Category</Label>
+                      <Input
+                        id="edit-category"
+                        value={editForm.category || ""}
+                        onChange={(e) => handleEditFormChange("category", e.target.value)}
+                        placeholder="Category"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-price">Price (₹)</Label>
+                      <Input
+                        id="edit-price"
+                        type="number"
+                        value={editForm.price || ""}
+                        onChange={(e) => handleEditFormChange("price", e.target.value)}
+                        placeholder="Price"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-stock">Stock Quantity</Label>
+                      <Input
+                        id="edit-stock"
+                        type="number"
+                        min="0"
+                        value={editForm.stock !== undefined ? editForm.stock : ""}
+                        onChange={(e) => handleEditFormChange("stock", parseInt(e.target.value) || 0)}
+                        placeholder="Stock quantity"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Current stock: {editForm.stock || 0} units
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-description">Description</Label>
+                    <Input
+                      id="edit-description"
+                      value={editForm.description || ""}
+                      onChange={(e) => handleEditFormChange("description", e.target.value)}
+                      placeholder="Product description"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-image">Image URL</Label>
+                    <Input
+                      id="edit-image"
+                      value={editForm.image || ""}
+                      onChange={(e) => handleEditFormChange("image", e.target.value)}
+                      placeholder="Image URL"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setEditingProduct(null)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveEdit}>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Orders Tab */}
@@ -432,25 +606,66 @@ export default function SellerDashboard() {
             <h2 className="text-xl sm:text-2xl font-bold">Orders</h2>
 
             <div className="space-y-4">
-              {orders.map((order) => (
+              {isLoadingOrders ? (
+                // Loading skeleton for orders
+                Array.from({ length: 3 }).map((_, index) => (
+                  <Card key={index}>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2">
+                            <div className="h-5 bg-gray-200 rounded animate-pulse w-24"></div>
+                            <div className="h-6 bg-gray-200 rounded animate-pulse w-20"></div>
+                          </div>
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-32"></div>
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-28"></div>
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-36"></div>
+                        </div>
+                        <div className="text-right">
+                          <div className="h-6 bg-gray-200 rounded animate-pulse w-20 mb-2"></div>
+                          <div className="h-8 bg-gray-200 rounded animate-pulse w-24"></div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : orders.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center text-gray-500">
+                    No orders found yet. Orders will appear here when customers place them.
+                  </CardContent>
+                </Card>
+              ) : (
+                orders.map((order) => (
                 <Card key={order.id}>
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">Order {order.id}</h3>
-                          <Badge className={getStatusColor(order.status)}>
-                            {getOrderStatusIcon(order.status)}
-                            <span className="ml-1">{order.status}</span>
+                            <h3 className="font-semibold">Order #{order.orderNumber}</h3>
+                            <Badge className={getStatusColor(order.orderStatus)}>
+                              {getOrderStatusIcon(order.orderStatus)}
+                              <span className="ml-1">{order.orderStatus}</span>
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600">Customer: {order.customer}</p>
-                        <p className="text-sm text-gray-600">Items: {order.items}</p>
-                        <p className="text-sm text-gray-600 hidden sm:block">Address: {order.address}</p>
-                        <p className="text-sm text-gray-600">Date: {order.date}</p>
+                          <p className="text-sm text-gray-600">Customer: {order.customerName}</p>
+                          <p className="text-sm text-gray-600">Phone: {order.customerPhone}</p>
+                          <p className="text-sm text-gray-600">Items: {order.itemsCount} products</p>
+                          <p className="text-sm text-gray-600 hidden sm:block">
+                            Address: {order.customerAddress}, {order.customerArea}, {order.customerCity}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Date: {new Date(order.createdAt).toLocaleDateString()}
+                          </p>
+                          <div className="text-xs text-gray-500">
+                            <p>Your Items: ₹{order.sellerSubtotal?.toLocaleString()}</p>
+                            <p>Commission: ₹{order.commission?.toLocaleString()}</p>
+                            <p className="font-medium">Net Amount: ₹{order.netAmount?.toLocaleString()}</p>
+                          </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-bold">₹{order.total}</p>
+                          <p className="text-lg font-bold">₹{order.totalAmount?.toLocaleString()}</p>
+                          <p className="text-sm text-gray-600 mb-2">Total Order</p>
                         <Button variant="outline" size="sm" className="mt-2 bg-transparent">
                           View Details
                         </Button>
@@ -458,7 +673,8 @@ export default function SellerDashboard() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                ))
+              )}
             </div>
           </TabsContent>
 
@@ -477,7 +693,7 @@ export default function SellerDashboard() {
                     <div className="flex justify-between">
                       <span>Total Sales</span>
                       <span className="font-bold">
-                        ₹{orders.reduce((sum, order) => sum + order.total, 0).toLocaleString()}
+                        ₹{orders.reduce((sum, order) => sum + (order.sellerSubtotal || 0), 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -488,9 +704,16 @@ export default function SellerDashboard() {
                       <span>Average Order Value</span>
                       <span className="font-bold">
                         ₹
-                        {Math.round(
-                          orders.reduce((sum, order) => sum + order.total, 0) / orders.length,
-                        ).toLocaleString()}
+                        {orders.length > 0 
+                          ? Math.round(orders.reduce((sum, order) => sum + (order.sellerSubtotal || 0), 0) / orders.length).toLocaleString()
+                          : '0'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Net Earnings</span>
+                      <span className="font-bold text-green-600">
+                        ₹{orders.reduce((sum, order) => sum + (order.netAmount || 0), 0).toLocaleString()}
                       </span>
                     </div>
                   </div>

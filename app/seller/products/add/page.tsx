@@ -13,6 +13,7 @@ import { ArrowLeft, Upload, X, Save, Eye } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getCookie } from "@/lib/utils"
+import { CATEGORIES } from "@/utils/category-data";
 
 interface ProductVariant {
   id: string
@@ -54,6 +55,7 @@ export default function AddProduct() {
     price: "",
     stock: "",
     tags: [] as string[],
+    subcategories: [] as string[], // Add subcategories as array
   })
 
   const [images, setImages] = useState<ProductImage[]>([])
@@ -162,13 +164,20 @@ export default function AddProduct() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!sellerInfo) return
+    const payload = {
+      ...productData,
+      subcategories: productData.subcategories.join(","),
+    };
     const res = await fetch("/api/product", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: productData.name,
-        description: productData.description,
-        price: productData.price,
+        name: payload.name,
+        description: payload.description,
+        price: payload.price,
+        stock: payload.stock,
+        category: payload.category,
+        subcategories: payload.subcategories,
         image: images[0]?.url || "",
         sellerId: sellerInfo.id,
       }),
@@ -176,7 +185,7 @@ export default function AddProduct() {
     const data = await res.json()
     if (res.ok) {
       setAddedProducts((prev) => [...prev, data.product])
-      setProductData({ name: "", description: "", category: "", price: "", stock: "", tags: [] })
+      setProductData({ name: "", description: "", category: "", price: "", stock: "", tags: [], subcategories: [] })
       setImages([])
       router.push("/seller/products/add/success")
     } else {
@@ -196,23 +205,18 @@ export default function AddProduct() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16">
-            <Link href="/seller/dashboard" className="flex items-center text-blue-600 hover:text-blue-800">
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Back to Dashboard
-            </Link>
-            <div className="ml-6">
-              <h1 className="text-xl font-bold">Add New Product</h1>
-              <p className="text-sm text-gray-600">Create a new product listing</p>
-            </div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="flex items-center mb-6">
+          <Link href="/seller/dashboard" className="flex items-center text-blue-600 hover:text-blue-800">
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Back to Dashboard
+          </Link>
+          <div className="ml-6">
+            <h1 className="text-xl font-bold">Add New Product</h1>
+            <p className="text-sm text-gray-600">Create a new product listing</p>
           </div>
         </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Add Product Form */}
           <Card>
@@ -253,17 +257,38 @@ export default function AddProduct() {
                   <select
                     id="category"
                     value={productData.category}
-                    onChange={(e) => handleInputChange("category", e.target.value)}
+                    onChange={(e) => {
+                      handleInputChange("category", e.target.value);
+                      setProductData((prev) => ({ ...prev, subcategories: [] })); // Reset subcategories on category change
+                    }}
                     className="w-full p-2 border border-gray-300 rounded-md"
                     required
                   >
                     <option value="">Select Category</option>
-                    {categories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="subcategories">Subcategories *</Label>
+                  <select
+                    id="subcategories"
+                    multiple
+                    value={productData.subcategories}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions, option => option.value);
+                      setProductData((prev) => ({ ...prev, subcategories: selected }));
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    required
+                  >
+                    <option value="" disabled>Select Subcategories</option>
+                    {(CATEGORIES.find(cat => cat.id === productData.category)?.subcategories || []).map((subcat) => (
+                      <option key={subcat} value={subcat}>{subcat}</option>
+                    ))}
+                  </select>
+                  <div className="text-xs text-gray-500">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
                 </div>
 
                 {/* Price and Stock */}

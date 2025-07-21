@@ -43,14 +43,6 @@ export default function SellerOrderHistory() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-16">
-          <Link href="/seller/dashboard" className="text-blue-600 flex items-center mr-4">
-            <ArrowLeft className="h-5 w-5 mr-1" /> Dashboard
-          </Link>
-          <h1 className="text-xl font-bold">Order History</h1>
-        </div>
-      </header>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {orders.length === 0 ? (
           <div className="text-center py-12 text-gray-500">

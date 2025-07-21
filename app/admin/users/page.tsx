@@ -124,28 +124,23 @@ export default function AdminUsersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/admin/dashboard" className="text-blue-600 hover:text-blue-800 mr-4">
-                ← Back to Dashboard
-              </Link>
-              <Shield className="h-6 w-6 text-blue-600 mr-2" />
-              <h1 className="text-xl font-bold">User Management</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={exportUserData}>
-                <Download className="h-4 w-4 mr-2" />
-                Export Data
-              </Button>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center">
+            <Link href="/admin/dashboard" className="text-blue-600 hover:text-blue-800 mr-4">
+              ← Back to Dashboard
+            </Link>
+            <Shield className="h-6 w-6 text-blue-600 mr-2" />
+            <h1 className="text-xl font-bold">User Management</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={exportUserData}>
+              <Download className="h-4 w-4 mr-2" />
+              Export Data
+            </Button>
           </div>
         </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900">All Platform Users</h2>
           <p className="text-gray-600">Comprehensive view of all registered users</p>

@@ -61,7 +61,7 @@ export default function BusinessPage() {
     )
   }
 
-  const categories = ["All", ...Array.from(new Set((business.products || []).map((p: any) => p.category || "General")))]
+  const categories = ["All", ...Array.from(new Set((business.products || []).map((p: any) => p.category || "General")))] as string[]
   const filteredProducts =
     selectedCategory === "All"
       ? business.products || []
@@ -100,32 +100,6 @@ export default function BusinessPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="text-2xl font-bold text-blue-600 mr-6">
-                LocalMarket
-              </Link>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm">
-                <MessageCircle className="h-4 w-4 mr-2" />
-                Chat
-              </Button>
-              <CartDrawer>
-                <Button variant="outline" size="sm">
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Cart ({cart.totalItems})
-                </Button>
-              </CartDrawer>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-6">
@@ -232,7 +206,7 @@ export default function BusinessPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => {
+            {filteredProducts.map((product: any) => {
               const quantity = getItemQuantity(product.id)
 
               return (

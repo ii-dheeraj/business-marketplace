@@ -91,21 +91,28 @@ export default function CheckoutPage() {
       }
       // Prepare order data
       const orderData = {
-        buyerId,
+        customerId: buyerId,
         items: cart.items.map((item) => ({
-          itemId: item.id,
-          sellerId: item.sellerId,
+          productId: item.id,
           quantity: item.quantity,
           price: item.price,
           name: item.name,
           image: item.image,
         })),
-        customerDetails,
-        paymentMethod: "", // Will be set on payment page
+        customerDetails: {
+          name: customerDetails.name,
+          phone: customerDetails.phone,
+          email: customerDetails.email,
+          address: customerDetails.address,
+          city: customerDetails.city,
+          area: customerDetails.state, // Map state to area
+          locality: customerDetails.landmark || "", // Map landmark to locality
+        },
+        paymentMethod: "CASH_ON_DELIVERY", // Default payment method, can be updated later
         totalAmount: cart.totalPrice + (cart.totalPrice >= 500 ? 0 : 49),
         subtotal: cart.totalPrice,
         deliveryFee: cart.totalPrice >= 500 ? 0 : 49,
-        paymentDetails: {},
+        deliveryInstructions: ""
       }
       // Create a temporary order in the DB (with paymentMethod empty)
       const res = await fetch("/api/order/place", {
@@ -131,27 +138,19 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="text-2xl font-bold text-blue-600 mr-6">
-                LocalMarket
-              </Link>
-              <span className="text-gray-500">Checkout</span>
-            </div>
-            <Link href="/">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Home
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center">
+            <span className="text-gray-500 text-lg font-medium">Checkout</span>
+          </div>
+          <Link href="/">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          </Link>
+        </div>
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Customer Details Form */}
           <div className="lg:col-span-2">

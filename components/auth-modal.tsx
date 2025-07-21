@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { User, Store, Truck, Eye, EyeOff } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { setCookie } from "@/lib/utils"
+import { setCookie, getUserInfo } from "@/lib/utils"
 
 interface AuthModalProps {
   isOpen: boolean
@@ -20,7 +20,7 @@ interface AuthModalProps {
 
 export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalProps) {
   const [mode, setMode] = useState<"login" | "register">(defaultMode)
-  const [userType, setUserType] = useState<"customer" | "seller" | "delivery" | null>(null)
+  const [userType, setUserType] = useState<"CUSTOMER" | "SELLER" | "DELIVERY_AGENT" | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
@@ -28,17 +28,20 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
     password: "",
     phone: "",
     businessName: "",
+    category: "",
+    subcategories: [] as string[],
     businessAddress: "",
-    businessCategory: "",
     businessCity: "",
     businessArea: "",
     businessLocality: "",
-    promoted: false,
+    businessDescription: "",
+    businessImage: "",
     vehicleNumber: "",
-    licenseNumber: "",
+    vehicleType: "",
   })
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
+  const [successMsg, setSuccessMsg] = useState("")
   const router = useRouter()
 
   useEffect(() => {
@@ -52,17 +55,21 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
       password: "",
       phone: "",
       businessName: "",
+      category: "",
+      subcategories: [],
       businessAddress: "",
-      businessCategory: "",
       businessCity: "",
       businessArea: "",
       businessLocality: "",
-      promoted: false,
+      businessDescription: "",
+      businessImage: "",
       vehicleNumber: "",
-      licenseNumber: "",
+      vehicleType: "",
     })
     setUserType(null)
     setShowPassword(false)
+    setErrorMsg("")
+    setSuccessMsg("")
   }
 
   const handleClose = () => {
@@ -70,13 +77,16 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
     onClose()
   }
 
-  const handleUserTypeSelect = (type: "customer" | "seller" | "delivery") => {
+  const handleUserTypeSelect = (type: "CUSTOMER" | "SELLER" | "DELIVERY_AGENT") => {
     setUserType(type)
+    setErrorMsg("")
+    setSuccessMsg("")
   }
 
   const handleBack = () => {
     setUserType(null)
-    setErrorMsg("") // Clear error when going back
+    setErrorMsg("")
+    setSuccessMsg("")
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,9 +98,11 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Form submitted, mode:", mode) // Debug log
+    console.log("[DEBUG] Form submitted, mode:", mode, "userType:", userType)
+    console.log("[DEBUG] Form data:", formData)
     setIsLoading(true)
     setErrorMsg("")
+    setSuccessMsg("")
 
     // Validate required fields
     if (mode === "login") {
@@ -106,9 +118,20 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
         return
       }
     }
-    if (mode === "register" && userType === "seller") {
-      if (!formData.businessCategory || !formData.businessCity || !formData.businessAddress) {
+    
+    // Validate seller-specific fields
+    if (mode === "register" && userType === "SELLER") {
+      if (!formData.category || !formData.businessCity || !formData.businessAddress) {
         setErrorMsg("Please fill all required business fields.")
+        setIsLoading(false)
+        return
+      }
+    }
+
+    // Validate delivery agent-specific fields
+    if (mode === "register" && userType === "DELIVERY_AGENT") {
+      if (!formData.vehicleNumber || !formData.vehicleType) {
+        setErrorMsg("Please fill all required delivery agent fields.")
         setIsLoading(false)
         return
       }
@@ -126,23 +149,36 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
           }),
         })
         const data = await res.json()
-        console.log("Login response:", data) // Debug log
+        console.log("[DEBUG] Login API response:", data)
+        
         if (!res.ok) {
           setErrorMsg(data.error || "Login failed")
           setIsLoading(false)
           return
         }
+
+        setSuccessMsg(`Successfully logged in as ${data.user.userType}!`)
+        
         // Store user info in cookie for session management
         setCookie("userInfo", JSON.stringify(data.user))
-        console.log("User info stored:", data.user) // Debug log
-        // Redirect based on userType
-        if (data.user.userType === "customer") {
+        console.log("[DEBUG] userInfo cookie set:", JSON.stringify(data.user))
+        
+        // Dispatch custom event to notify header about login
+        window.dispatchEvent(new CustomEvent('userLogin', { detail: data.user }))
+        
+        // Redirect based on userType immediately
+        if (data.user.userType === "CUSTOMER") {
+          console.log("[DEBUG] Redirecting to /customer/home")
           router.push("/customer/home")
-        } else if (data.user.userType === "seller") {
+        } else if (data.user.userType === "SELLER") {
+          console.log("[DEBUG] Redirecting to /seller/dashboard")
           router.push("/seller/dashboard")
-        } else if (data.user.userType === "delivery") {
+        } else if (data.user.userType === "DELIVERY_AGENT") {
+          console.log("[DEBUG] Redirecting to /delivery/dashboard")
           router.push("/delivery/dashboard")
         }
+        handleClose()
+        
       } else {
         // Call register API
         const res = await fetch("/api/auth/register", {
@@ -154,34 +190,54 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
             password: formData.password,
             phone: formData.phone,
             userType,
-            ...(userType === "seller"
+            ...(userType === "SELLER"
               ? {
-                  category: formData.businessCategory,
-                  city: formData.businessCity,
-                  area: formData.businessArea,
-                  locality: formData.businessLocality,
-                  address: formData.businessAddress,
-                  promoted: formData.promoted,
+                  businessName: formData.businessName || formData.name,
+                  category: formData.category,
+                  subcategories: formData.subcategories || [],
+                  businessAddress: formData.businessAddress,
+                  businessCity: formData.businessCity,
+                  businessArea: formData.businessArea,
+                  businessLocality: formData.businessLocality,
+                  businessDescription: formData.businessDescription,
+                  businessImage: formData.businessImage,
+                }
+              : {}),
+            ...(userType === "DELIVERY_AGENT"
+              ? {
+                  vehicleNumber: formData.vehicleNumber,
+                  vehicleType: formData.vehicleType,
                 }
               : {}),
           }),
         })
         const data = await res.json()
+        console.log("Register response:", data)
+        
         if (!res.ok) {
           setErrorMsg(data.error || "Registration failed")
           setIsLoading(false)
           return
         }
-        // Redirect based on userType
-        if (data.user.userType === "customer") {
+
+        setSuccessMsg(`Successfully registered as ${data.user.userType}!`)
+        
+        // Store user info in cookie for session management
+        setCookie("userInfo", JSON.stringify(data.user))
+        
+        // Dispatch custom event to notify header about registration
+        window.dispatchEvent(new CustomEvent('userLogin', { detail: data.user }))
+        
+        // Redirect based on userType immediately
+        if (data.user.userType === "CUSTOMER") {
           router.push("/customer/home")
-        } else if (data.user.userType === "seller") {
+        } else if (data.user.userType === "SELLER") {
           router.push("/seller/dashboard")
-        } else if (data.user.userType === "delivery") {
+        } else if (data.user.userType === "DELIVERY_AGENT") {
           router.push("/delivery/dashboard")
         }
+        handleClose()
       }
-      handleClose()
     } catch (error: any) {
       console.error("Auth error:", error)
       setErrorMsg(error.message || "An unexpected error occurred.")
@@ -192,21 +248,21 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
 
   const userTypes = [
     {
-      id: "customer",
+      id: "CUSTOMER",
       title: "Customer",
       description: "Shop from local businesses",
       icon: User,
       color: "bg-blue-50 border-blue-200 hover:bg-blue-100",
     },
     {
-      id: "seller",
+      id: "SELLER",
       title: "Seller",
       description: "Sell your products online",
       icon: Store,
       color: "bg-green-50 border-green-200 hover:bg-green-100",
     },
     {
-      id: "delivery",
+      id: "DELIVERY_AGENT",
       title: "Delivery Agent",
       description: "Deliver orders and earn",
       icon: Truck,
@@ -215,22 +271,36 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
   ]
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        handleClose()
+      }
+    }}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader className="text-center">
           <DialogTitle className="text-2xl font-bold text-gray-900">
             {!userType ? "Choose Your Role" : `${mode === "login" ? "Sign In" : "Sign Up"} as ${userType}`}
           </DialogTitle>
         </DialogHeader>
+        
         {errorMsg && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
             <p className="text-sm text-red-700 font-medium">{errorMsg}</p>
           </div>
         )}
 
+        {successMsg && (
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
+            <p className="text-sm text-green-700 font-medium">{successMsg}</p>
+          </div>
+        )}
+
         {!userType ? (
           <div className="space-y-6">
             <p className="text-sm text-gray-600 text-center">Select how you want to use LocalMarket</p>
+            
+
+            
             <div className="grid gap-4">
               {userTypes.map((type) => {
                 const Icon = type.icon
@@ -238,7 +308,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                   <Card
                     key={type.id}
                     className={`cursor-pointer transition-all duration-200 hover:shadow-md ${type.color} border-2 hover:border-opacity-100`}
-                    onClick={() => handleUserTypeSelect(type.id as "customer" | "seller" | "delivery")}
+                    onClick={() => handleUserTypeSelect(type.id as "CUSTOMER" | "SELLER" | "DELIVERY_AGENT")}
                   >
                     <CardContent className="flex items-center p-6">
                       <div className={`p-3 rounded-full ${type.color.replace('bg-', 'bg-').replace('border-', 'bg-')} mr-4`}>
@@ -258,7 +328,8 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
           <div className="space-y-4">
             <Tabs value={mode} onValueChange={(value) => {
               setMode(value as "login" | "register")
-              setErrorMsg("") // Clear error when switching modes
+              setErrorMsg("")
+              setSuccessMsg("")
             }}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Sign In</TabsTrigger>
@@ -291,15 +362,13 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                         className="h-12 text-base pr-12"
                         required
                       />
-                      <Button
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
                     </div>
                   </div>
                   <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
@@ -358,20 +427,17 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                         className="h-12 text-base pr-12"
                         required
                       />
-                      <Button
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
                     </div>
                   </div>
 
-                  {/* Additional fields based on user type */}
-                  {userType === "seller" && (
+                  {userType === "SELLER" && (
                     <>
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700">Business Name</label>
@@ -382,16 +448,27 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                           value={formData.businessName}
                           onChange={handleInputChange}
                           className="h-12 text-base"
-                          required
                         />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700">Business Category</label>
                         <Input
-                          name="businessCategory"
+                          name="category"
                           type="text"
-                          placeholder="e.g., Electronics, Grocery, Fashion"
-                          value={formData.businessCategory}
+                          placeholder="e.g., food-beverage, electronics-appliances"
+                          value={formData.category}
+                          onChange={handleInputChange}
+                          className="h-12 text-base"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">Business Address</label>
+                        <Input
+                          name="businessAddress"
+                          type="text"
+                          placeholder="Enter your business address"
+                          value={formData.businessAddress}
                           onChange={handleInputChange}
                           className="h-12 text-base"
                           required
@@ -410,7 +487,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Area (Optional)</label>
+                        <label className="text-sm font-medium text-gray-700">Area</label>
                         <Input
                           name="businessArea"
                           type="text"
@@ -421,7 +498,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Locality (Optional)</label>
+                        <label className="text-sm font-medium text-gray-700">Locality</label>
                         <Input
                           name="businessLocality"
                           type="text"
@@ -432,34 +509,20 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Business Address</label>
+                        <label className="text-sm font-medium text-gray-700">Business Description</label>
                         <Input
-                          name="businessAddress"
+                          name="businessDescription"
                           type="text"
-                          placeholder="Enter your business address"
-                          value={formData.businessAddress}
+                          placeholder="Brief description of your business"
+                          value={formData.businessDescription}
                           onChange={handleInputChange}
                           className="h-12 text-base"
-                          required
                         />
-                      </div>
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <input
-                          type="checkbox"
-                          id="promoted"
-                          name="promoted"
-                          checked={formData.promoted}
-                          onChange={(e) => setFormData({ ...formData, promoted: e.target.checked })}
-                          className="h-4 w-4 text-blue-600 rounded"
-                        />
-                        <label htmlFor="promoted" className="text-sm font-medium text-gray-700">
-                          Promote my business (featured listing)
-                        </label>
                       </div>
                     </>
                   )}
 
-                  {userType === "delivery" && (
+                  {userType === "DELIVERY_AGENT" && (
                     <>
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700">Vehicle Number</label>
@@ -474,12 +537,12 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Driving License Number</label>
+                        <label className="text-sm font-medium text-gray-700">Vehicle Type</label>
                         <Input
-                          name="licenseNumber"
+                          name="vehicleType"
                           type="text"
-                          placeholder="Enter your driving license number"
-                          value={formData.licenseNumber}
+                          placeholder="e.g., Motorcycle, Car, Bicycle"
+                          value={formData.vehicleType}
                           onChange={handleInputChange}
                           className="h-12 text-base"
                           required

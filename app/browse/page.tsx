@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
+import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Search,
   MapPin,
@@ -17,317 +19,32 @@ import {
   Target,
   Building,
   ChevronUp,
+  Mic,
+  MicOff,
+  Camera,
+  X,
+  Clock,
+  Star,
+  DollarSign,
+  Loader2,
 } from "lucide-react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useCart } from "@/hooks/useCart"
 import { useLocation } from "@/hooks/useLocation"
 import { CartDrawer } from "@/components/cart-drawer"
+import { CATEGORIES } from "@/utils/category-data";
+
+// TypeScript declarations for speech recognition
+declare global {
+  interface Window {
+    SpeechRecognition: any
+    webkitSpeechRecognition: any
+  }
+}
 
 // Enhanced business data with detailed location hierarchy
-const BUSINESSES = [
-  {
-    id: 1,
-    name: "Sharma Electronics",
-    category: "Electronics",
-    subcategory: "Mobile & Accessories",
-    location: "MG Road, Bangalore",
-    city: "Bangalore",
-    area: "MG Road",
-    locality: "Brigade Road Junction",
-    landmark: "Near Metro Station",
-    pincode: "560001",
-    coordinates: { lat: 12.9716, lng: 77.5946 },
-    rating: 4.5,
-    reviews: 128,
-    image: "/placeholder.svg?height=200&width=300&text=Electronics+Store",
-    isOpen: true,
-    deliveryTime: "30-45 mins",
-    priceRange: "₹₹",
-    distance: "2.3 km",
-    deliveryRadius: 5,
-    products: [
-      { name: "iPhone 15", price: 79999, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Samsung Galaxy", price: 65999, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  {
-    id: 2,
-    name: "Taste of India Restaurant",
-    category: "Restaurant",
-    subcategory: "North Indian",
-    location: "Koramangala, Bangalore",
-    city: "Bangalore",
-    area: "Koramangala",
-    locality: "5th Block",
-    landmark: "Near Forum Mall",
-    pincode: "560095",
-    coordinates: { lat: 12.9352, lng: 77.6245 },
-    rating: 4.8,
-    reviews: 256,
-    image: "/placeholder.svg?height=200&width=300&text=Indian+Restaurant",
-    isOpen: true,
-    deliveryTime: "25-35 mins",
-    priceRange: "₹₹",
-    distance: "1.8 km",
-    deliveryRadius: 3,
-    products: [
-      { name: "Butter Chicken", price: 299, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Biryani", price: 249, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  {
-    id: 3,
-    name: "Pizza Corner",
-    category: "Restaurant",
-    subcategory: "Italian",
-    location: "Brigade Road, Bangalore",
-    city: "Bangalore",
-    area: "Brigade Road",
-    locality: "Church Street",
-    landmark: "Opposite UB City Mall",
-    pincode: "560025",
-    coordinates: { lat: 12.9698, lng: 77.6205 },
-    rating: 4.2,
-    reviews: 189,
-    image: "/placeholder.svg?height=200&width=300&text=Pizza+Restaurant",
-    isOpen: true,
-    deliveryTime: "20-30 mins",
-    priceRange: "₹₹₹",
-    distance: "3.1 km",
-    deliveryRadius: 4,
-    products: [
-      { name: "Margherita Pizza", price: 399, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Pepperoni Pizza", price: 499, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  {
-    id: 4,
-    name: "Fresh Mart Grocery",
-    category: "Grocery",
-    subcategory: "Supermarket",
-    location: "Whitefield, Bangalore",
-    city: "Bangalore",
-    area: "Whitefield",
-    locality: "ITPL Main Road",
-    landmark: "Near Phoenix MarketCity",
-    pincode: "560066",
-    coordinates: { lat: 12.9698, lng: 77.75 },
-    rating: 4.3,
-    reviews: 89,
-    image: "/placeholder.svg?height=200&width=300&text=Grocery+Store",
-    isOpen: false,
-    deliveryTime: "45-60 mins",
-    priceRange: "₹",
-    distance: "5.2 km",
-    deliveryRadius: 6,
-    products: [
-      { name: "Fresh Vegetables", price: 150, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Dairy Products", price: 200, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  {
-    id: 5,
-    name: "Fashion Hub",
-    category: "Fashion",
-    subcategory: "Clothing",
-    location: "Commercial Street, Bangalore",
-    city: "Bangalore",
-    area: "Commercial Street",
-    locality: "Shivaji Nagar",
-    landmark: "Near Russell Market",
-    pincode: "560001",
-    coordinates: { lat: 12.9833, lng: 77.6167 },
-    rating: 4.1,
-    reviews: 67,
-    image: "/placeholder.svg?height=200&width=300&text=Fashion+Store",
-    isOpen: true,
-    deliveryTime: "1-2 days",
-    priceRange: "₹₹",
-    distance: "2.7 km",
-    deliveryRadius: 8,
-    products: [
-      { name: "T-Shirts", price: 599, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Jeans", price: 1299, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  {
-    id: 6,
-    name: "Heavy Equipment Solutions",
-    category: "Construction Equipment",
-    subcategory: "Excavators",
-    location: "Industrial Area, Bangalore",
-    city: "Bangalore",
-    area: "Peenya Industrial Area",
-    locality: "4th Phase",
-    landmark: "Near Peenya Metro Station",
-    pincode: "560058",
-    coordinates: { lat: 13.0389, lng: 77.5194 },
-    rating: 4.6,
-    reviews: 45,
-    image: "/placeholder.svg?height=200&width=300&text=Construction+Equipment",
-    isOpen: true,
-    deliveryTime: "Contact for delivery",
-    priceRange: "₹₹₹₹",
-    distance: "8.5 km",
-    deliveryRadius: 15,
-    products: [
-      { name: "Caterpillar Excavator", price: 4500000, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Komatsu Excavator", price: 3800000, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  {
-    id: 7,
-    name: "Cafe Mocha",
-    category: "Restaurant",
-    subcategory: "Cafe",
-    location: "Indiranagar, Bangalore",
-    city: "Bangalore",
-    area: "Indiranagar",
-    locality: "100 Feet Road",
-    landmark: "Near CMH Road Junction",
-    pincode: "560038",
-    coordinates: { lat: 12.9719, lng: 77.6412 },
-    rating: 4.4,
-    reviews: 134,
-    image: "/placeholder.svg?height=200&width=300&text=Cafe",
-    isOpen: true,
-    deliveryTime: "15-25 mins",
-    priceRange: "₹₹",
-    distance: "1.2 km",
-    deliveryRadius: 3,
-    products: [
-      { name: "Cappuccino", price: 149, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Sandwich", price: 199, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  {
-    id: 8,
-    name: "Tech Repair Hub",
-    category: "Services",
-    subcategory: "Electronics Repair",
-    location: "HSR Layout, Bangalore",
-    city: "Bangalore",
-    area: "HSR Layout",
-    locality: "Sector 1",
-    landmark: "Near BDA Complex",
-    pincode: "560102",
-    coordinates: { lat: 12.9082, lng: 77.6476 },
-    rating: 4.7,
-    reviews: 92,
-    image: "/placeholder.svg?height=200&width=300&text=Repair+Service",
-    isOpen: true,
-    deliveryTime: "Same day",
-    priceRange: "₹₹",
-    distance: "4.1 km",
-    deliveryRadius: 5,
-    products: [
-      { name: "Phone Repair", price: 999, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Laptop Repair", price: 1999, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  {
-    id: 9,
-    name: "Spice Garden Restaurant",
-    category: "Restaurant",
-    subcategory: "South Indian",
-    location: "Koramangala, Bangalore",
-    city: "Bangalore",
-    area: "Koramangala",
-    locality: "6th Block",
-    landmark: "Near Sony World Signal",
-    pincode: "560095",
-    coordinates: { lat: 12.9279, lng: 77.6271 },
-    rating: 4.6,
-    reviews: 203,
-    image: "/placeholder.svg?height=200&width=300&text=South+Indian+Restaurant",
-    isOpen: true,
-    deliveryTime: "30-40 mins",
-    priceRange: "₹₹",
-    distance: "2.1 km",
-    deliveryRadius: 4,
-    products: [
-      { name: "Masala Dosa", price: 120, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Filter Coffee", price: 40, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  {
-    id: 10,
-    name: "BookWorm Library Cafe",
-    category: "Restaurant",
-    subcategory: "Cafe",
-    location: "Indiranagar, Bangalore",
-    city: "Bangalore",
-    area: "Indiranagar",
-    locality: "12th Main Road",
-    landmark: "Near Chinnaswamy Stadium",
-    pincode: "560038",
-    coordinates: { lat: 12.9698, lng: 77.6382 },
-    rating: 4.3,
-    reviews: 87,
-    image: "/placeholder.svg?height=200&width=300&text=Library+Cafe",
-    isOpen: true,
-    deliveryTime: "20-30 mins",
-    priceRange: "₹₹",
-    distance: "1.5 km",
-    deliveryRadius: 3,
-    products: [
-      { name: "Cold Brew", price: 180, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Cheesecake", price: 250, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  // Add Mumbai businesses
-  {
-    id: 11,
-    name: "Mumbai Spice Kitchen",
-    category: "Restaurant",
-    subcategory: "Indian",
-    location: "Andheri, Mumbai",
-    city: "Mumbai",
-    area: "Andheri",
-    locality: "Andheri West",
-    landmark: "Near Infinity Mall",
-    pincode: "400053",
-    coordinates: { lat: 19.1136, lng: 72.8697 },
-    rating: 4.4,
-    reviews: 178,
-    image: "/placeholder.svg?height=200&width=300&text=Mumbai+Restaurant",
-    isOpen: true,
-    deliveryTime: "35-45 mins",
-    priceRange: "₹₹",
-    distance: "2.8 km",
-    deliveryRadius: 5,
-    products: [
-      { name: "Vada Pav", price: 25, image: "/placeholder.svg?height=100&width=100" },
-      { name: "Pav Bhaji", price: 120, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-  {
-    id: 12,
-    name: "Bandra Electronics Hub",
-    category: "Electronics",
-    subcategory: "Mobile & Accessories",
-    location: "Bandra, Mumbai",
-    city: "Mumbai",
-    area: "Bandra",
-    locality: "Bandra West",
-    landmark: "Near Linking Road",
-    pincode: "400050",
-    coordinates: { lat: 19.0596, lng: 72.8295 },
-    rating: 4.2,
-    reviews: 95,
-    image: "/placeholder.svg?height=200&width=300&text=Mumbai+Electronics",
-    isOpen: true,
-    deliveryTime: "40-50 mins",
-    priceRange: "₹₹",
-    distance: "3.5 km",
-    deliveryRadius: 6,
-    products: [
-      { name: "iPhone 15", price: 79999, image: "/placeholder.svg?height=100&width=100" },
-      { name: "OnePlus 12", price: 64999, image: "/placeholder.svg?height=100&width=100" },
-    ],
-  },
-]
+
 
 // Location hierarchy structure - Updated with multiple cities
 const locationHierarchy = {
@@ -464,67 +181,17 @@ const cityAreas = {
   ],
 }
 
-// Category structure with subcategories - Updated with actual counts
-const categoryFilters = [
-  {
-    name: "Restaurant",
-    count: 5,
-    subcategories: [
-      { name: "North Indian", count: 1 },
-      { name: "South Indian", count: 1 },
-      { name: "Italian", count: 1 },
-      { name: "Cafe", count: 2 },
-      { name: "Indian", count: 1 },
-      { name: "Chinese", count: 0 },
-      { name: "Fast Food", count: 0 },
-    ],
-  },
-  {
-    name: "Electronics",
-    count: 2,
-    subcategories: [
-      { name: "Mobile & Accessories", count: 2 },
-      { name: "Laptops", count: 0 },
-      { name: "Audio", count: 0 },
-    ],
-  },
-  {
-    name: "Grocery",
-    count: 1,
-    subcategories: [
-      { name: "Supermarket", count: 1 },
-      { name: "Organic", count: 0 },
-      { name: "Local Store", count: 0 },
-    ],
-  },
-  {
-    name: "Fashion",
-    count: 1,
-    subcategories: [
-      { name: "Clothing", count: 1 },
-      { name: "Shoes", count: 0 },
-      { name: "Accessories", count: 0 },
-    ],
-  },
-  {
-    name: "Services",
-    count: 1,
-    subcategories: [
-      { name: "Electronics Repair", count: 1 },
-      { name: "Home Services", count: 0 },
-      { name: "Beauty", count: 0 },
-    ],
-  },
-  {
-    name: "Construction Equipment",
-    count: 1,
-    subcategories: [
-      { name: "Excavators", count: 1 },
-      { name: "Cranes", count: 0 },
-      { name: "Bulldozers", count: 0 },
-    ],
-  },
-]
+// Ensure categoryFilters is always CATEGORIES (array of objects)
+const categoryFilters = CATEGORIES;
+
+// Add a mapping for legacy/old category ids to new ones
+const CATEGORY_ID_MAP: Record<string, string> = {
+  grocery: 'retail-general-stores',
+  groceries: 'retail-general-stores',
+  restaurant: 'food-beverage',
+  food: 'food-beverage',
+  // add more mappings as needed
+};
 
 const sortOptions = [
   { value: "relevance", label: "Relevance" },
@@ -536,6 +203,51 @@ const sortOptions = [
 ]
 
 const popularCities = ["Bangalore", "Mumbai", "Delhi", "Chennai", "Hyderabad"]
+
+// Search suggestions and history
+const searchSuggestionsData = [
+  "Restaurant", "Electronics", "Grocery", "Fashion", "Pizza", "Coffee", "Biryani", "Mobile", "Laptop", "Vegetables",
+  "North Indian", "South Indian", "Italian", "Chinese", "Fast Food", "Cafe", "Supermarket", "Clothing", "Shoes", "Accessories"
+]
+
+// Delivery time options
+const deliveryTimeOptions = [
+  { value: "", label: "Any Time" },
+  { value: "15-30", label: "15-30 mins" },
+  { value: "30-45", label: "30-45 mins" },
+  { value: "45-60", label: "45-60 mins" },
+  { value: "1-2", label: "1-2 hours" },
+  { value: "same-day", label: "Same Day" },
+  { value: "next-day", label: "Next Day" }
+]
+
+// Add interfaces for type safety
+interface Product {
+  name: string;
+  price: number;
+}
+interface Business {
+  id: string;
+  name: string;
+  image?: string;
+  isOpen: boolean;
+  location: string;
+  city: string;
+  area: string;
+  locality: string;
+  category: string;
+  subcategory: string;
+  rating: number;
+  reviews: number;
+  priceRange: string;
+  deliveryTime: string;
+  distance: string;
+  products: Product[];
+}
+interface Locality {
+  name: string;
+  count: number;
+}
 
 export default function BrowsePage() {
   const searchParams = useSearchParams()
@@ -549,28 +261,84 @@ export default function BrowsePage() {
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([])
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000])
   const [ratingFilter, setRatingFilter] = useState(0)
-  const [distanceFilter, setDistanceFilter] = useState<[number]>([10])
+  const [distanceFilter, setDistanceFilter] = useState<number[]>([10])
+  const [deliveryTimeFilter, setDeliveryTimeFilter] = useState<string>("")
   const [sortBy, setSortBy] = useState("relevance")
+  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [loading, setLoading] = useState(true)
+
+  /* Advanced Search Features */
+  const [isVoiceSearchActive, setIsVoiceSearchActive] = useState(false)
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [searchHistory, setSearchHistory] = useState<string[]>([])
+  const [imageSearchDialog, setImageSearchDialog] = useState(false)
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null)
 
   /* UI helpers */
   const [showFilters, setShowFilters] = useState(false)
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(["Restaurant"])
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(["food-beverage"])
   const [expandedAreas, setExpandedAreas] = useState<string[]>([])
   const [showLocationDropdown, setShowLocationDropdown] = useState(false)
 
+  // Refs for voice search
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const recognitionRef = useRef<any>(null)
+
   // Use location from global state
-  const selectedCity = location.selectedCity || "Bangalore"
+  const selectedCity = location.selectedCity
   const selectedArea = location.selectedArea || "All Areas"
+
+  // Fetch businesses from API
+  useEffect(() => {
+    const fetchBusinesses = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch("/api/business")
+        const data = await res.json()
+        setBusinesses(data.businesses || [])
+      } catch (error) {
+        console.error("Error fetching businesses:", error)
+        setBusinesses([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchBusinesses()
+  }, [])
+
+  // Place dynamicCategoryFilters here, with the other hooks
+  const dynamicCategoryFilters = useMemo(() => {
+    // Get unique categories from businesses
+    const uniqueCategories = Array.from(new Set(businesses.map(b => b.category)));
+    return uniqueCategories.map(catId => {
+      // Try to get a friendly name from utils/category-data if possible
+      const catObj = require("@/utils/category-data").getCategoryById(catId);
+      return {
+        id: catId,
+        name: catObj ? catObj.name : catId,
+        count: businesses.filter(b => b.category === catId).length,
+        subcategories: [], // You can enhance this to pull subcategories if needed
+      };
+    });
+  }, [businesses]);
 
   /* ------------------------------------------------------------------ */
   /* 2.  INITIALISE FROM URL – runs ONCE, avoids infinite loop          */
   /* ------------------------------------------------------------------ */
   useEffect(() => {
-    const q = searchParams.get("search") ?? ""
+    const q = searchParams.get("q") ?? searchParams.get("search") ?? ""
     const city = searchParams.get("city") ?? ""
     const area = searchParams.get("area") ?? ""
     const locality = searchParams.get("locality") ?? ""
-    const category = searchParams.get("category") ?? ""
+    let category = searchParams.get("category") ?? ""
+
+    // Map legacy category ids to new ones
+    if (CATEGORY_ID_MAP[category]) {
+      category = CATEGORY_ID_MAP[category];
+    }
+
+    console.log("[DEBUG] Browse page received search params:", { q, city, area, locality, category })
 
     /* only update when different to current state, so we don't loop */
     setSearchQuery((s) => (s !== q ? q : s))
@@ -585,17 +353,21 @@ export default function BrowsePage() {
   /* 3.  FILTER + SORT (memoised)                                       */
   /* ------------------------------------------------------------------ */
   const filteredBusinesses = useMemo(() => {
-    return BUSINESSES.filter((b) => {
+    console.log("[DEBUG] Filtering businesses with search query:", searchQuery)
+    const filtered = businesses.filter((b) => {
       // Search query matching
       const matchesSearch =
         !searchQuery ||
-        b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.subcategory.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.locality.toLowerCase().includes(searchQuery.toLowerCase())
+        (b.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (b.category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (b.subcategory || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (b.locality || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        b.products.some((product: Product) =>
+          (product.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+        )
 
       // Location matching
-      const matchesCity = !selectedCity || selectedCity === "Select Location" || b.city === selectedCity
+      const matchesCity = !selectedCity || b.city === selectedCity
       const matchesArea = selectedArea === "All Areas" || b.area === selectedArea
       const matchesLocality = selectedLocalities.length === 0 || selectedLocalities.includes(b.locality)
 
@@ -606,6 +378,27 @@ export default function BrowsePage() {
       // Other filters
       const matchesRating = b.rating >= ratingFilter
       const matchesDistance = Number.parseFloat(b.distance) <= distanceFilter[0]
+      
+      // Delivery time filter
+      const matchesDeliveryTime = !deliveryTimeFilter || (() => {
+        const deliveryTime = b.deliveryTime.toLowerCase()
+        switch (deliveryTimeFilter) {
+          case "15-30":
+            return deliveryTime.includes("15") || deliveryTime.includes("20") || deliveryTime.includes("25") || deliveryTime.includes("30")
+          case "30-45":
+            return deliveryTime.includes("30") || deliveryTime.includes("35") || deliveryTime.includes("40") || deliveryTime.includes("45")
+          case "45-60":
+            return deliveryTime.includes("45") || deliveryTime.includes("50") || deliveryTime.includes("55") || deliveryTime.includes("60")
+          case "1-2":
+            return deliveryTime.includes("1-2") || deliveryTime.includes("2 hours")
+          case "same-day":
+            return deliveryTime.includes("same day") || deliveryTime.includes("today")
+          case "next-day":
+            return deliveryTime.includes("next day") || deliveryTime.includes("tomorrow")
+          default:
+            return true
+        }
+      })()
 
       return (
         matchesSearch &&
@@ -615,10 +408,16 @@ export default function BrowsePage() {
         matchesCategory &&
         matchesSubcategory &&
         matchesRating &&
-        matchesDistance
+        matchesDistance &&
+        matchesDeliveryTime
       )
     })
+    
+    console.log("[DEBUG] Filtered businesses:", filtered);
+    console.log("[DEBUG] Selected categories:", selectedCategories);
+    return filtered
   }, [
+    businesses,
     searchQuery,
     selectedCity,
     selectedArea,
@@ -627,6 +426,7 @@ export default function BrowsePage() {
     selectedSubcategories,
     ratingFilter,
     distanceFilter,
+    deliveryTimeFilter,
   ])
 
   const sortedBusinesses = useMemo(() => {
@@ -647,11 +447,22 @@ export default function BrowsePage() {
   /* 4.  RENDER – (no logic changed below this line)                    */
   /* ------------------------------------------------------------------ */
 
-  const toggleCategory = (category: string) => {
-    if (expandedCategories.includes(category)) {
-      setExpandedCategories(expandedCategories.filter((c) => c !== category))
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Loading businesses...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const toggleCategory = (categoryId: string) => {
+    if (expandedCategories.includes(categoryId)) {
+      setExpandedCategories(expandedCategories.filter((c) => c !== categoryId))
     } else {
-      setExpandedCategories([...expandedCategories, category])
+      setExpandedCategories([...expandedCategories, categoryId])
     }
   }
 
@@ -663,12 +474,12 @@ export default function BrowsePage() {
     }
   }
 
-  const handleCategoryChange = (category: string, checked: boolean) => {
+  const handleCategoryChange = (categoryId: string, checked: boolean) => {
     if (checked) {
-      setSelectedCategories([...selectedCategories, category])
+      setSelectedCategories([...selectedCategories, categoryId])
     } else {
-      setSelectedCategories(selectedCategories.filter((c) => c !== category))
-      const categoryData = categoryFilters.find((c) => c.name === category)
+      setSelectedCategories(selectedCategories.filter((c) => c !== categoryId))
+      const categoryData = categoryFilters.find((c) => c.id === categoryId)
       if (categoryData) {
         const subcatsToRemove = categoryData.subcategories.map((s) => s.name)
         setSelectedSubcategories(selectedSubcategories.filter((s) => !subcatsToRemove.includes(s)))
@@ -713,8 +524,97 @@ export default function BrowsePage() {
     setPriceRange([0, 5000])
     setRatingFilter(0)
     setDistanceFilter([10])
+    setDeliveryTimeFilter("")
     setSearchQuery("")
     setArea("All Areas")
+  }
+
+  // Advanced Search Functions
+  const generateSearchSuggestions = (query: string) => {
+    if (!query.trim()) {
+      setSearchSuggestions([])
+      return
+    }
+    
+    const suggestions = searchSuggestionsData.filter(item =>
+      item.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 5)
+    
+    setSearchSuggestions(suggestions)
+  }
+
+  const handleSearchInputChange = (value: string) => {
+    setSearchQuery(value)
+    generateSearchSuggestions(value)
+    setShowSuggestions(true)
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setSearchQuery(suggestion)
+    setShowSuggestions(false)
+    // Add to search history
+    if (!searchHistory.includes(suggestion)) {
+      setSearchHistory(prev => [suggestion, ...prev.slice(0, 9)])
+    }
+  }
+
+  const startVoiceSearch = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Voice search is not supported in your browser')
+      return
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    recognitionRef.current = new SpeechRecognition()
+    recognitionRef.current.continuous = false
+    recognitionRef.current.interimResults = false
+    recognitionRef.current.lang = 'en-US'
+
+    recognitionRef.current.onstart = () => {
+      setIsVoiceSearchActive(true)
+    }
+
+    recognitionRef.current.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript
+      setSearchQuery(transcript)
+      setIsVoiceSearchActive(false)
+      generateSearchSuggestions(transcript)
+    }
+
+    recognitionRef.current.onerror = () => {
+      setIsVoiceSearchActive(false)
+      alert('Voice search failed. Please try again.')
+    }
+
+    recognitionRef.current.onend = () => {
+      setIsVoiceSearchActive(false)
+    }
+
+    recognitionRef.current.start()
+  }
+
+  const stopVoiceSearch = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      setIsVoiceSearchActive(false)
+    }
+  }
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setUploadedImage(e.target?.result as string)
+        // Simulate image search - in real implementation, this would call an AI service
+        setTimeout(() => {
+          setSearchQuery("electronics mobile phone")
+          setImageSearchDialog(false)
+          setUploadedImage(null)
+        }, 2000)
+      }
+      reader.readAsDataURL(file)
+    }
   }
 
   // Use useMemo to prevent infinite re-renders
@@ -730,23 +630,23 @@ export default function BrowsePage() {
     if (selectedArea === "All Areas") {
       // Return all localities from all areas with updated counts
       const allLocalities = Object.values(cityData)
-        .flatMap((area) => area.localities)
-        .filter((locality, index, self) => self.findIndex((l) => l.name === locality.name) === index)
+        .flatMap((area: { localities: Locality[] }) => area.localities)
+        .filter((locality: Locality, index: number, self: Locality[]) => self.findIndex((l) => l.name === locality.name) === index)
 
       // Update counts based on actual businesses
-      return allLocalities.map((locality) => ({
+      return allLocalities.map((locality: Locality) => ({
         ...locality,
-        count: BUSINESSES.filter((b) => b.city === selectedCity && b.locality === locality.name).length,
+        count: businesses.filter((b) => b.city === selectedCity && b.locality === locality.name).length,
       }))
     }
 
     // Return localities for specific area with updated counts
-    const areaData = cityData[selectedArea as keyof typeof cityData]
+    const areaData = cityData[selectedArea as keyof typeof cityData] as { localities: Locality[] } | undefined
     if (!areaData) return []
 
-    return areaData.localities.map((locality) => ({
+    return areaData.localities.map((locality: Locality) => ({
       ...locality,
-      count: BUSINESSES.filter(
+      count: businesses.filter(
         (b) => b.city === selectedCity && b.area === selectedArea && b.locality === locality.name,
       ).length,
     }))
@@ -754,70 +654,6 @@ export default function BrowsePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with Location */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="text-2xl font-bold text-blue-600 mr-6">
-                LocalMarket
-              </Link>
-
-              {/* Location Selector */}
-              <div className="relative">
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2 bg-transparent"
-                  onClick={() => setShowLocationDropdown(!showLocationDropdown)}
-                >
-                  <MapPin className="h-4 w-4 text-red-500" />
-                  <span className="font-medium">{getLocationDisplay()}</span>
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-
-                {showLocationDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-64 bg-white border rounded-lg shadow-lg z-50">
-                    <div className="p-3 border-b">
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                        <Target className="h-4 w-4" />
-                        <span>Select your city</span>
-                      </div>
-                    </div>
-                    <div className="p-2">
-                      <div className="text-xs text-gray-500 mb-2">POPULAR CITIES</div>
-                      {popularCities.map((city) => (
-                        <button
-                          key={city}
-                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 rounded ${
-                            selectedCity === city ? "bg-blue-50 text-blue-600 font-medium" : ""
-                          }`}
-                          onClick={() => handleCityChange(city)}
-                        >
-                          📍 {city}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm">
-                <MessageCircle className="h-4 w-4 mr-2" />
-                Chat
-              </Button>
-              <CartDrawer>
-                <Button variant="outline" size="sm">
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Cart ({cart.totalItems})
-                </Button>
-              </CartDrawer>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Location Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
@@ -840,18 +676,86 @@ export default function BrowsePage() {
           )}
         </div>
 
-        {/* Search Bar */}
+        {/* Advanced Search Bar */}
         <div className="mb-6">
           <div className="flex gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <Input
+                ref={searchInputRef}
                 placeholder={`Search for businesses, products, or services in ${selectedCity}...`}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-12 text-lg"
+                onChange={(e) => handleSearchInputChange(e.target.value)}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                className="pl-12 pr-24 h-12 text-lg"
               />
+              
+              {/* Voice Search Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-16 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                onClick={isVoiceSearchActive ? stopVoiceSearch : startVoiceSearch}
+                disabled={!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)}
+              >
+                {isVoiceSearchActive ? (
+                  <MicOff className="h-4 w-4 text-red-500" />
+                ) : (
+                  <Mic className="h-4 w-4 text-gray-500" />
+                )}
+              </Button>
+              
+              {/* Image Search Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-8 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                onClick={() => setImageSearchDialog(true)}
+              >
+                <Camera className="h-4 w-4 text-gray-500" />
+              </Button>
+              
+              {/* Search Suggestions Dropdown */}
+              {showSuggestions && (searchSuggestions.length > 0 || searchHistory.length > 0) && (
+                <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 mt-1">
+                  {/* Search History */}
+                  {searchHistory.length > 0 && !searchQuery && (
+                    <div className="p-2 border-b">
+                      <div className="text-xs text-gray-500 mb-2 px-2">Recent Searches</div>
+                      {searchHistory.slice(0, 3).map((item, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 px-2 py-2 hover:bg-gray-50 cursor-pointer rounded"
+                          onClick={() => handleSuggestionClick(item)}
+                        >
+                          <Clock className="h-3 w-3 text-gray-400" />
+                          <span className="text-sm">{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Search Suggestions */}
+                  {searchSuggestions.length > 0 && (
+                    <div className="p-2">
+                      <div className="text-xs text-gray-500 mb-2 px-2">Suggestions</div>
+                      {searchSuggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 px-2 py-2 hover:bg-gray-50 cursor-pointer rounded"
+                          onClick={() => handleSuggestionClick(suggestion)}
+                        >
+                          <Search className="h-3 w-3 text-gray-400" />
+                          <span className="text-sm">{suggestion}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+            
             <Button
               variant="outline"
               className="lg:hidden h-12 bg-transparent"
@@ -959,60 +863,70 @@ export default function BrowsePage() {
                 </div>
               </div>
 
+              {/* Delivery Time Filter */}
+              <div className="space-y-3 pb-4 border-b">
+                <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Delivery Time
+                </h4>
+                <div className="space-y-2">
+                  <select
+                    value={deliveryTimeFilter}
+                    onChange={(e) => setDeliveryTimeFilter(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    {deliveryTimeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Rating Filter */}
+              <div className="space-y-3 pb-4 border-b">
+                <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                  <Star className="h-4 w-4" />
+                  Minimum Rating
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>{ratingFilter}+ stars</span>
+                  </div>
+                  <Slider
+                    value={[ratingFilter]}
+                    onValueChange={(value) => setRatingFilter(value[0])}
+                    max={5}
+                    min={0}
+                    step={0.5}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>0+</span>
+                    <span>5+</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Categories */}
               <div className="space-y-4">
                 <h4 className="font-medium text-gray-900">Categories</h4>
                 <div className="space-y-3 max-h-80 overflow-y-auto">
                   {categoryFilters.map((category) => (
-                    <div key={category.name} className="space-y-2">
+                    <div key={category.id} className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={category.name}
-                            checked={selectedCategories.includes(category.name)}
-                            onCheckedChange={(checked) => handleCategoryChange(category.name, checked as boolean)}
-                          />
-                          <label htmlFor={category.name} className="text-sm font-medium cursor-pointer">
-                            {category.name}
-                          </label>
-                          <span className="text-xs text-gray-500">({category.count})</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0"
-                          onClick={() => toggleCategory(category.name)}
-                        >
-                          {expandedCategories.includes(category.name) ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <Checkbox
+                          id={category.id}
+                          checked={selectedCategories.includes(category.id)}
+                          onCheckedChange={(checked) => handleCategoryChange(category.id, checked as boolean)}
+                        />
+                        <label htmlFor={category.id} className="text-sm font-medium cursor-pointer">
+                          {category.name}
+                        </label>
+                        {/* No count available in CATEGORIES */}
                       </div>
-                      {expandedCategories.includes(category.name) && (
-                        <div className="space-y-2 pl-6">
-                          {categoryFilters
-                            .find((c) => c.name === category.name)
-                            ?.subcategories.map((subcategory) => (
-                              <div key={subcategory.name} className="flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={subcategory.name}
-                                    checked={selectedSubcategories.includes(subcategory.name)}
-                                    onCheckedChange={(checked) =>
-                                      handleSubcategoryChange(subcategory.name, checked as boolean)
-                                    }
-                                  />
-                                  <label htmlFor={subcategory.name} className="text-sm cursor-pointer">
-                                    {subcategory.name}
-                                  </label>
-                                </div>
-                                <span className="text-xs text-gray-500">({subcategory.count})</span>
-                              </div>
-                            ))}
-                        </div>
-                      )}
+                      {/* Remove subcategory toggle for now */}
                     </div>
                   ))}
                 </div>
@@ -1022,6 +936,30 @@ export default function BrowsePage() {
 
           {/* Main Content - Business Listings */}
           <div className="flex-1">
+            {/* Search Results Header */}
+            {searchQuery && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-blue-900">
+                      Search Results for "{searchQuery}"
+                    </h3>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Found {filteredBusinesses.length} businesses and products matching your search
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setSearchQuery("")}
+                    className="text-blue-600 border-blue-300 hover:bg-blue-100"
+                  >
+                    Clear Search
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">
                 {filteredBusinesses.length} Results in {selectedArea}, {selectedCity}
@@ -1075,6 +1013,29 @@ export default function BrowsePage() {
                         <span>•</span>
                         <span>{business.subcategory}</span>
                       </div>
+                      
+                      {/* Show matching products when searching */}
+                      {searchQuery && business.products.some((product: Product) => 
+                        product.name.toLowerCase().includes(searchQuery.toLowerCase())
+                      ) && (
+                        <div className="mb-2">
+                          <p className="text-xs text-green-600 font-medium mb-1">Matching Products:</p>
+                          <div className="space-y-1">
+                            {business.products
+                              .filter((product: Product) => 
+                                product.name.toLowerCase().includes(searchQuery.toLowerCase())
+                              )
+                              .slice(0, 2)
+                              .map((product: Product, index: number) => (
+                                <div key={index} className="text-xs text-gray-600 flex items-center gap-1">
+                                  <span>•</span>
+                                  <span>{product.name}</span>
+                                  <span className="text-green-600">₹{product.price}</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <span className="text-yellow-500">
@@ -1112,6 +1073,67 @@ export default function BrowsePage() {
           </div>
         </div>
       </div>
+
+      {/* Image Search Dialog */}
+      <Dialog open={imageSearchDialog} onOpenChange={setImageSearchDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5" />
+              Search by Image
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Upload an image to find similar products or businesses
+            </p>
+            
+            {uploadedImage ? (
+              <div className="space-y-4">
+                <div className="relative">
+                  <img
+                    src={uploadedImage}
+                    alt="Uploaded"
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute top-2 right-2 h-8 w-8 p-0 bg-white/80 hover:bg-white"
+                    onClick={() => setUploadedImage(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-sm text-gray-600 mt-2">Analyzing image...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-sm text-gray-600 mb-4">
+                  Click to upload an image or drag and drop
+                </p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="image-upload"
+                />
+                <label
+                  htmlFor="image-upload"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"
+                >
+                  Choose Image
+                </label>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

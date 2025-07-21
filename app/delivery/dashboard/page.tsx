@@ -75,26 +75,6 @@ export default function DeliveryDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-blue-600">LocalMarket</h1>
-              <span className="ml-4 text-gray-500">Delivery Partner</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="default" className="bg-green-500">
-                Online
-              </Badge>
-              <Button variant="outline" size="sm">
-                Go Offline
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Welcome back, Raj!</h1>

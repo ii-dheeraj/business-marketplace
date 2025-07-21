@@ -26,8 +26,8 @@ import Image from "next/image"
 import { CartDrawer } from "@/components/cart-drawer"
 import { useCart } from "@/hooks/useCart"
 import { useLocation } from "@/hooks/useLocation"
-import { AuthModal } from "@/components/auth-modal"
-import { getCookie, removeCookie } from "@/lib/utils"
+
+import { getCookie, deleteCookie } from "@/lib/utils"
 
 // Location data
 const locationData = {
@@ -132,8 +132,7 @@ export default function HomePage() {
   const [isLoadingContent, setIsLoadingContent] = useState(false)
   const [userInfo, setUserInfo] = useState<any>(null)
   const [userType, setUserType] = useState<string>("")
-  const [authModalOpen, setAuthModalOpen] = useState(false)
-  const [authMode, setAuthMode] = useState<"login" | "register">("login")
+
   const [businesses, setBusinesses] = useState<any[]>([])
   const router = useRouter()
   const { addToCart, getItemQuantity } = useCart()
@@ -147,6 +146,14 @@ export default function HomePage() {
         const user = JSON.parse(userInfoCookie)
         setUserInfo(user)
         setUserType(user.userType)
+        // Redirect if already logged in
+        if (user.userType === "CUSTOMER") {
+          router.replace("/customer/home")
+        } else if (user.userType === "SELLER") {
+          router.replace("/seller/dashboard")
+        } else if (user.userType === "DELIVERY_AGENT") {
+          router.replace("/delivery/dashboard")
+        }
       } catch {
         setUserInfo(null)
         setUserType("")
@@ -155,7 +162,7 @@ export default function HomePage() {
       setUserInfo(null)
       setUserType("")
     }
-  }, [])
+  }, [router])
 
   // Fetch businesses from API
   useEffect(() => {
@@ -213,13 +220,16 @@ export default function HomePage() {
   }
 
   const handleSearch = () => {
+    console.log("[DEBUG] Home page search triggered with query:", searchQuery)
     const params = new URLSearchParams()
     if (searchQuery) params.set("q", searchQuery)
     if (location.selectedCity) params.set("city", location.selectedCity)
     if (location.selectedArea && location.selectedArea !== "All Areas") params.set("area", location.selectedArea)
     if (location.selectedLocality) params.set("locality", location.selectedLocality)
 
-    router.push(`/browse?${params.toString()}`)
+    const searchUrl = `/browse?${params.toString()}`
+    console.log("[DEBUG] Home page navigating to:", searchUrl)
+    router.push(searchUrl)
   }
 
   const handleAddToCart = (business: any, product: any) => {
@@ -235,16 +245,13 @@ export default function HomePage() {
 
   const handleLogout = () => {
     // Remove user info cookie
-    removeCookie("userInfo")
+            deleteCookie("userInfo")
     setUserInfo(null)
     setUserType("")
     router.push("/")
   }
 
-  const openAuthModal = (mode: "login" | "register") => {
-    setAuthMode(mode)
-    setAuthModalOpen(true)
-  }
+
 
   const categories = [
     { name: "Electronics", icon: "📱", count: "500+" },
@@ -267,61 +274,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="text-2xl font-bold text-blue-600">
-                LocalMarket
-              </Link>
-            </div>
-            <div className="flex items-center space-x-4">
-              <CartDrawer />
-              {userInfo ? (
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-600">Welcome, {userInfo.name}</span>
-                  {userType === "seller" && (
-                    <Link href="/seller/dashboard">
-                      <Button variant="outline" size="sm">
-                        Dashboard
-                      </Button>
-                    </Link>
-                  )}
-                  {userType === "delivery" && (
-                    <Link href="/delivery/dashboard">
-                      <Button variant="outline" size="sm">
-                        Dashboard
-                      </Button>
-                    </Link>
-                  )}
-                  {userType === "customer" && (
-                    <Link href="/customer/home">
-                      <Button variant="outline" size="sm">
-                        My Home
-                      </Button>
-                    </Link>
-                  )}
-                  <Button variant="outline" size="sm" onClick={handleLogout}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => openAuthModal("login")}>
-                    Sign In
-                  </Button>
-                  <Button size="sm" onClick={() => openAuthModal("register")}>
-                    Join Now
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-blue-600 to-purple-700 text-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -395,11 +347,17 @@ export default function HomePage() {
                 <Input
                   placeholder="Search for businesses, products..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1"
+                  onChange={(e) => {
+                    console.log("[DEBUG] Home page search input changed to:", e.target.value)
+                    setSearchQuery(e.target.value)
+                  }}
+                  className="flex-1 text-gray-900 placeholder:text-gray-500 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   onKeyPress={(e) => e.key === "Enter" && handleSearch()}
                 />
-                <Button onClick={handleSearch} className="px-6">
+                <Button onClick={() => {
+                  console.log("[DEBUG] Home page search button clicked")
+                  handleSearch()
+                }} className="px-6">
                   <Search className="h-4 w-4" />
                 </Button>
               </div>
@@ -746,8 +704,6 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* Auth Modal */}
-      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} defaultMode={authMode} />
     </div>
   )
 }

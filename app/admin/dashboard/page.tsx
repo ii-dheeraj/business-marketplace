@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { getCookie, removeCookie } from "@/lib/utils"
+import { getCookie, deleteCookie } from "@/lib/utils"
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
@@ -41,7 +41,7 @@ export default function AdminDashboard() {
   }, [router])
 
   const handleLogout = () => {
-    removeCookie("adminInfo")
+            deleteCookie("adminInfo")
     router.push("/admin/login")
   }
 
@@ -104,44 +104,40 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Admin Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Shield className="h-8 w-8 text-blue-600 mr-3" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">LocalMarket Admin</h1>
-                <p className="text-xs text-gray-500">Administration Panel</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium">{adminInfo.name}</p>
-                <p className="text-xs text-gray-500">{adminInfo.role}</p>
-              </div>
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                Super Admin
-              </Badge>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center">
+            <Shield className="h-8 w-8 text-blue-600 mr-3" />
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">LocalMarket Admin</h1>
+              <p className="text-xs text-gray-500">Administration Panel</p>
             </div>
           </div>
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <p className="text-sm font-medium">{adminInfo.name}</p>
+              <p className="text-xs text-gray-500">{adminInfo.role}</p>
+            </div>
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+              Super Admin
+            </Badge>
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900">Admin Dashboard</h2>
           <p className="text-gray-600">Monitor and manage your marketplace platform</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -356,6 +352,64 @@ export default function AdminDashboard() {
                       <Button variant="outline" className="w-full justify-start bg-transparent">
                         <Truck className="h-4 w-4 mr-2" />
                         Manage Delivery Partners ({stats.delivery})
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="orders" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-2xl font-bold">Order Management</h3>
+              <Link href="/admin/orders">
+                <Button>
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  View All Orders
+                </Button>
+              </Link>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Order Statistics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between">
+                      <span>Total Orders</span>
+                      <span className="font-bold text-blue-600">{stats.totalOrders}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Pending Orders</span>
+                      <span className="font-bold text-yellow-600">0</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Delivered Orders</span>
+                      <span className="font-bold text-green-600">0</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <Link href="/admin/orders">
+                      <Button variant="outline" className="w-full justify-start bg-transparent">
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Manage All Orders
+                      </Button>
+                    </Link>
+                    <Link href="/admin/orders">
+                      <Button variant="outline" className="w-full justify-start bg-transparent">
+                        <Truck className="h-4 w-4 mr-2" />
+                        Update Order Tracking
                       </Button>
                     </Link>
                   </div>

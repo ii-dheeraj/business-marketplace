@@ -152,7 +152,7 @@ export default function SellerLogin() {
           <div className="mt-6 text-center space-y-2">
             <p className="text-sm text-gray-600">
               Don't have an account?{" "}
-              <Link href="/auth/register" className="text-blue-600 hover:underline">
+              <Link href="/seller/register" className="text-blue-600 hover:underline">
                 Register as Seller
               </Link>
             </p>
