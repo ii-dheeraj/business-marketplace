@@ -40,6 +40,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { getCookie, deleteCookie } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast";
+import { indianStates, indianStateCityMap } from "@/utils/indian-location-data";
 
 // Remove mockProducts array and any references to it
 
@@ -785,28 +786,49 @@ export default function SellerDashboard() {
                 <CardContent className="py-6 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="profile-name">Name</Label>
-                      <Input id="profile-name" value={profileForm.name || ""} onChange={e => handleProfileInputChange("name", e.target.value)} />
+                      <Label htmlFor="profile-businessState">State <span className="text-red-500">*</span></Label>
+                      <select id="profile-businessState" value={profileForm.businessState || ""} onChange={e => {
+                        handleProfileInputChange("businessState", e.target.value);
+                        handleProfileInputChange("businessCity", ""); // Reset city when state changes
+                      }} required className="w-full border rounded px-2 py-2">
+                        <option value="">Select State</option>
+                        {indianStates.map(state => <option key={state} value={state}>{state}</option>)}
+                      </select>
                     </div>
                     <div>
-                      <Label htmlFor="profile-email">Email</Label>
-                      <Input id="profile-email" value={profileForm.email || ""} onChange={e => handleProfileInputChange("email", e.target.value)} type="email" />
+                      <Label htmlFor="profile-businessCity">City <span className="text-red-500">*</span></Label>
+                      <select id="profile-businessCity" value={profileForm.businessCity || ""} onChange={e => handleProfileInputChange("businessCity", e.target.value)} required className="w-full border rounded px-2 py-2" disabled={!profileForm.businessState}>
+                        <option value="">{profileForm.businessState ? "Select City" : "Select State first"}</option>
+                        {profileForm.businessState && indianStateCityMap[profileForm.businessState]?.map((city: string) => <option key={city} value={city}>{city}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-name">Name <span className="text-red-500">*</span></Label>
+                      <Input id="profile-name" value={profileForm.name || ""} onChange={e => handleProfileInputChange("name", e.target.value)} required />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-businessName">Business Name <span className="text-red-500">*</span></Label>
+                      <Input id="profile-businessName" value={profileForm.businessName || ""} onChange={e => handleProfileInputChange("businessName", e.target.value)} required />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-email">Email <span className="text-red-500">*</span></Label>
+                      <Input id="profile-email" value={profileForm.email || ""} onChange={e => handleProfileInputChange("email", e.target.value)} type="email" required />
                     </div>
                     <div>
                       <Label htmlFor="profile-phone">Phone</Label>
                       <Input id="profile-phone" value={profileForm.phone || ""} onChange={e => handleProfileInputChange("phone", e.target.value)} />
                     </div>
                     <div>
-                      <Label htmlFor="profile-businessName">Business Name</Label>
-                      <Input id="profile-businessName" value={profileForm.businessName || ""} onChange={e => handleProfileInputChange("businessName", e.target.value)} />
+                      <Label htmlFor="profile-website">Website</Label>
+                      <Input id="profile-website" value={profileForm.website || ""} onChange={e => handleProfileInputChange("website", e.target.value)} placeholder="https://yourstore.com" />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-businessPincode">Pincode <span className="text-red-500">*</span></Label>
+                      <Input id="profile-businessPincode" value={profileForm.businessPincode || ""} onChange={e => handleProfileInputChange("businessPincode", e.target.value.replace(/[^0-9]/g, '').slice(0,6))} maxLength={6} required pattern="^[0-9]{6}$" placeholder="6-digit pincode" />
                     </div>
                     <div>
                       <Label htmlFor="profile-businessAddress">Business Address</Label>
                       <Input id="profile-businessAddress" value={profileForm.businessAddress || ""} onChange={e => handleProfileInputChange("businessAddress", e.target.value)} />
-                    </div>
-                    <div>
-                      <Label htmlFor="profile-businessCity">Business City</Label>
-                      <Input id="profile-businessCity" value={profileForm.businessCity || ""} onChange={e => handleProfileInputChange("businessCity", e.target.value)} />
                     </div>
                     <div>
                       <Label htmlFor="profile-businessArea">Business Area</Label>
@@ -816,13 +838,27 @@ export default function SellerDashboard() {
                       <Label htmlFor="profile-businessLocality">Business Locality</Label>
                       <Input id="profile-businessLocality" value={profileForm.businessLocality || ""} onChange={e => handleProfileInputChange("businessLocality", e.target.value)} />
                     </div>
-                    <div>
+                    <div className="md:col-span-2">
                       <Label htmlFor="profile-businessDescription">Business Description</Label>
-                      <Input id="profile-businessDescription" value={profileForm.businessDescription || ""} onChange={e => handleProfileInputChange("businessDescription", e.target.value)} />
+                      <textarea id="profile-businessDescription" value={profileForm.businessDescription || ""} onChange={e => handleProfileInputChange("businessDescription", e.target.value)} rows={4} className="w-full border rounded px-2 py-2" placeholder="Describe your business..." />
                     </div>
                     <div>
-                      <Label htmlFor="profile-businessImage">Business Image URL</Label>
-                      <Input id="profile-businessImage" value={profileForm.businessImage || ""} onChange={e => handleProfileInputChange("businessImage", e.target.value)} />
+                      <Label htmlFor="profile-businessImage">Business Image</Label>
+                      <Input id="profile-businessImage" type="file" accept="image/*" onChange={async e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          // Simulate upload: use a local URL for now
+                          const url = URL.createObjectURL(file);
+                          handleProfileInputChange("businessImage", url);
+                        }
+                      }} />
+                      {profileForm.businessImage && (
+                        <img src={profileForm.businessImage} alt="Business" className="mt-2 rounded w-32 h-32 object-cover" />
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-openingHours">Opening Hours</Label>
+                      <Input id="profile-openingHours" value={profileForm.openingHours || ""} onChange={e => handleProfileInputChange("openingHours", e.target.value)} placeholder="e.g. 9:00 AM - 9:00 PM" />
                     </div>
                   </div>
                   <div className="flex gap-2 justify-end mt-4">

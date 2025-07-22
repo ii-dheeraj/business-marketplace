@@ -106,6 +106,7 @@ export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus]
 
 
 export const PaymentMethod: {
+  PENDING: 'PENDING',
   CASH_ON_DELIVERY: 'CASH_ON_DELIVERY',
   ONLINE_PAYMENT: 'ONLINE_PAYMENT',
   WALLET: 'WALLET'
@@ -3155,14 +3156,18 @@ export namespace Prisma {
     password: string | null
     avatar: string | null
     businessName: string | null
+    website: string | null
     category: string | null
     subcategories: string | null
     businessAddress: string | null
     businessCity: string | null
+    businessState: string | null
+    businessPincode: string | null
     businessArea: string | null
     businessLocality: string | null
     businessDescription: string | null
     businessImage: string | null
+    openingHours: string | null
     isVerified: boolean | null
     isPromoted: boolean | null
     rating: number | null
@@ -3181,14 +3186,18 @@ export namespace Prisma {
     password: string | null
     avatar: string | null
     businessName: string | null
+    website: string | null
     category: string | null
     subcategories: string | null
     businessAddress: string | null
     businessCity: string | null
+    businessState: string | null
+    businessPincode: string | null
     businessArea: string | null
     businessLocality: string | null
     businessDescription: string | null
     businessImage: string | null
+    openingHours: string | null
     isVerified: boolean | null
     isPromoted: boolean | null
     rating: number | null
@@ -3207,14 +3216,18 @@ export namespace Prisma {
     password: number
     avatar: number
     businessName: number
+    website: number
     category: number
     subcategories: number
     businessAddress: number
     businessCity: number
+    businessState: number
+    businessPincode: number
     businessArea: number
     businessLocality: number
     businessDescription: number
     businessImage: number
+    openingHours: number
     isVerified: number
     isPromoted: number
     rating: number
@@ -3247,14 +3260,18 @@ export namespace Prisma {
     password?: true
     avatar?: true
     businessName?: true
+    website?: true
     category?: true
     subcategories?: true
     businessAddress?: true
     businessCity?: true
+    businessState?: true
+    businessPincode?: true
     businessArea?: true
     businessLocality?: true
     businessDescription?: true
     businessImage?: true
+    openingHours?: true
     isVerified?: true
     isPromoted?: true
     rating?: true
@@ -3273,14 +3290,18 @@ export namespace Prisma {
     password?: true
     avatar?: true
     businessName?: true
+    website?: true
     category?: true
     subcategories?: true
     businessAddress?: true
     businessCity?: true
+    businessState?: true
+    businessPincode?: true
     businessArea?: true
     businessLocality?: true
     businessDescription?: true
     businessImage?: true
+    openingHours?: true
     isVerified?: true
     isPromoted?: true
     rating?: true
@@ -3299,14 +3320,18 @@ export namespace Prisma {
     password?: true
     avatar?: true
     businessName?: true
+    website?: true
     category?: true
     subcategories?: true
     businessAddress?: true
     businessCity?: true
+    businessState?: true
+    businessPincode?: true
     businessArea?: true
     businessLocality?: true
     businessDescription?: true
     businessImage?: true
+    openingHours?: true
     isVerified?: true
     isPromoted?: true
     rating?: true
@@ -3412,14 +3437,18 @@ export namespace Prisma {
     password: string
     avatar: string | null
     businessName: string
+    website: string | null
     category: string
     subcategories: string
     businessAddress: string
     businessCity: string
+    businessState: string
+    businessPincode: string
     businessArea: string | null
     businessLocality: string | null
     businessDescription: string | null
     businessImage: string | null
+    openingHours: string | null
     isVerified: boolean
     isPromoted: boolean
     rating: number
@@ -3457,14 +3486,18 @@ export namespace Prisma {
     password?: boolean
     avatar?: boolean
     businessName?: boolean
+    website?: boolean
     category?: boolean
     subcategories?: boolean
     businessAddress?: boolean
     businessCity?: boolean
+    businessState?: boolean
+    businessPincode?: boolean
     businessArea?: boolean
     businessLocality?: boolean
     businessDescription?: boolean
     businessImage?: boolean
+    openingHours?: boolean
     isVerified?: boolean
     isPromoted?: boolean
     rating?: boolean
@@ -3486,14 +3519,18 @@ export namespace Prisma {
     password?: boolean
     avatar?: boolean
     businessName?: boolean
+    website?: boolean
     category?: boolean
     subcategories?: boolean
     businessAddress?: boolean
     businessCity?: boolean
+    businessState?: boolean
+    businessPincode?: boolean
     businessArea?: boolean
     businessLocality?: boolean
     businessDescription?: boolean
     businessImage?: boolean
+    openingHours?: boolean
     isVerified?: boolean
     isPromoted?: boolean
     rating?: boolean
@@ -3512,14 +3549,18 @@ export namespace Prisma {
     password?: boolean
     avatar?: boolean
     businessName?: boolean
+    website?: boolean
     category?: boolean
     subcategories?: boolean
     businessAddress?: boolean
     businessCity?: boolean
+    businessState?: boolean
+    businessPincode?: boolean
     businessArea?: boolean
     businessLocality?: boolean
     businessDescription?: boolean
     businessImage?: boolean
+    openingHours?: boolean
     isVerified?: boolean
     isPromoted?: boolean
     rating?: boolean
@@ -3538,14 +3579,18 @@ export namespace Prisma {
     password?: boolean
     avatar?: boolean
     businessName?: boolean
+    website?: boolean
     category?: boolean
     subcategories?: boolean
     businessAddress?: boolean
     businessCity?: boolean
+    businessState?: boolean
+    businessPincode?: boolean
     businessArea?: boolean
     businessLocality?: boolean
     businessDescription?: boolean
     businessImage?: boolean
+    openingHours?: boolean
     isVerified?: boolean
     isPromoted?: boolean
     rating?: boolean
@@ -3556,7 +3601,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type SellerOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "email" | "phone" | "password" | "avatar" | "businessName" | "category" | "subcategories" | "businessAddress" | "businessCity" | "businessArea" | "businessLocality" | "businessDescription" | "businessImage" | "isVerified" | "isPromoted" | "rating" | "totalReviews" | "deliveryTime" | "isOpen" | "createdAt" | "updatedAt", ExtArgs["result"]["seller"]>
+  export type SellerOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "email" | "phone" | "password" | "avatar" | "businessName" | "website" | "category" | "subcategories" | "businessAddress" | "businessCity" | "businessState" | "businessPincode" | "businessArea" | "businessLocality" | "businessDescription" | "businessImage" | "openingHours" | "isVerified" | "isPromoted" | "rating" | "totalReviews" | "deliveryTime" | "isOpen" | "createdAt" | "updatedAt", ExtArgs["result"]["seller"]>
   export type SellerInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     products?: boolean | Seller$productsArgs<ExtArgs>
     sellerOrders?: boolean | Seller$sellerOrdersArgs<ExtArgs>
@@ -3579,14 +3624,18 @@ export namespace Prisma {
       password: string
       avatar: string | null
       businessName: string
+      website: string | null
       category: string
       subcategories: string
       businessAddress: string
       businessCity: string
+      businessState: string
+      businessPincode: string
       businessArea: string | null
       businessLocality: string | null
       businessDescription: string | null
       businessImage: string | null
+      openingHours: string | null
       isVerified: boolean
       isPromoted: boolean
       rating: number
@@ -4027,14 +4076,18 @@ export namespace Prisma {
     readonly password: FieldRef<"Seller", 'String'>
     readonly avatar: FieldRef<"Seller", 'String'>
     readonly businessName: FieldRef<"Seller", 'String'>
+    readonly website: FieldRef<"Seller", 'String'>
     readonly category: FieldRef<"Seller", 'String'>
     readonly subcategories: FieldRef<"Seller", 'String'>
     readonly businessAddress: FieldRef<"Seller", 'String'>
     readonly businessCity: FieldRef<"Seller", 'String'>
+    readonly businessState: FieldRef<"Seller", 'String'>
+    readonly businessPincode: FieldRef<"Seller", 'String'>
     readonly businessArea: FieldRef<"Seller", 'String'>
     readonly businessLocality: FieldRef<"Seller", 'String'>
     readonly businessDescription: FieldRef<"Seller", 'String'>
     readonly businessImage: FieldRef<"Seller", 'String'>
+    readonly openingHours: FieldRef<"Seller", 'String'>
     readonly isVerified: FieldRef<"Seller", 'Boolean'>
     readonly isPromoted: FieldRef<"Seller", 'Boolean'>
     readonly rating: FieldRef<"Seller", 'Float'>
@@ -14199,14 +14252,18 @@ export namespace Prisma {
     password: 'password',
     avatar: 'avatar',
     businessName: 'businessName',
+    website: 'website',
     category: 'category',
     subcategories: 'subcategories',
     businessAddress: 'businessAddress',
     businessCity: 'businessCity',
+    businessState: 'businessState',
+    businessPincode: 'businessPincode',
     businessArea: 'businessArea',
     businessLocality: 'businessLocality',
     businessDescription: 'businessDescription',
     businessImage: 'businessImage',
+    openingHours: 'openingHours',
     isVerified: 'isVerified',
     isPromoted: 'isPromoted',
     rating: 'rating',
@@ -14582,14 +14639,18 @@ export namespace Prisma {
     password?: StringFilter<"Seller"> | string
     avatar?: StringNullableFilter<"Seller"> | string | null
     businessName?: StringFilter<"Seller"> | string
+    website?: StringNullableFilter<"Seller"> | string | null
     category?: StringFilter<"Seller"> | string
     subcategories?: StringFilter<"Seller"> | string
     businessAddress?: StringFilter<"Seller"> | string
     businessCity?: StringFilter<"Seller"> | string
+    businessState?: StringFilter<"Seller"> | string
+    businessPincode?: StringFilter<"Seller"> | string
     businessArea?: StringNullableFilter<"Seller"> | string | null
     businessLocality?: StringNullableFilter<"Seller"> | string | null
     businessDescription?: StringNullableFilter<"Seller"> | string | null
     businessImage?: StringNullableFilter<"Seller"> | string | null
+    openingHours?: StringNullableFilter<"Seller"> | string | null
     isVerified?: BoolFilter<"Seller"> | boolean
     isPromoted?: BoolFilter<"Seller"> | boolean
     rating?: FloatFilter<"Seller"> | number
@@ -14610,14 +14671,18 @@ export namespace Prisma {
     password?: SortOrder
     avatar?: SortOrderInput | SortOrder
     businessName?: SortOrder
+    website?: SortOrderInput | SortOrder
     category?: SortOrder
     subcategories?: SortOrder
     businessAddress?: SortOrder
     businessCity?: SortOrder
+    businessState?: SortOrder
+    businessPincode?: SortOrder
     businessArea?: SortOrderInput | SortOrder
     businessLocality?: SortOrderInput | SortOrder
     businessDescription?: SortOrderInput | SortOrder
     businessImage?: SortOrderInput | SortOrder
+    openingHours?: SortOrderInput | SortOrder
     isVerified?: SortOrder
     isPromoted?: SortOrder
     rating?: SortOrder
@@ -14641,14 +14706,18 @@ export namespace Prisma {
     password?: StringFilter<"Seller"> | string
     avatar?: StringNullableFilter<"Seller"> | string | null
     businessName?: StringFilter<"Seller"> | string
+    website?: StringNullableFilter<"Seller"> | string | null
     category?: StringFilter<"Seller"> | string
     subcategories?: StringFilter<"Seller"> | string
     businessAddress?: StringFilter<"Seller"> | string
     businessCity?: StringFilter<"Seller"> | string
+    businessState?: StringFilter<"Seller"> | string
+    businessPincode?: StringFilter<"Seller"> | string
     businessArea?: StringNullableFilter<"Seller"> | string | null
     businessLocality?: StringNullableFilter<"Seller"> | string | null
     businessDescription?: StringNullableFilter<"Seller"> | string | null
     businessImage?: StringNullableFilter<"Seller"> | string | null
+    openingHours?: StringNullableFilter<"Seller"> | string | null
     isVerified?: BoolFilter<"Seller"> | boolean
     isPromoted?: BoolFilter<"Seller"> | boolean
     rating?: FloatFilter<"Seller"> | number
@@ -14669,14 +14738,18 @@ export namespace Prisma {
     password?: SortOrder
     avatar?: SortOrderInput | SortOrder
     businessName?: SortOrder
+    website?: SortOrderInput | SortOrder
     category?: SortOrder
     subcategories?: SortOrder
     businessAddress?: SortOrder
     businessCity?: SortOrder
+    businessState?: SortOrder
+    businessPincode?: SortOrder
     businessArea?: SortOrderInput | SortOrder
     businessLocality?: SortOrderInput | SortOrder
     businessDescription?: SortOrderInput | SortOrder
     businessImage?: SortOrderInput | SortOrder
+    openingHours?: SortOrderInput | SortOrder
     isVerified?: SortOrder
     isPromoted?: SortOrder
     rating?: SortOrder
@@ -14703,14 +14776,18 @@ export namespace Prisma {
     password?: StringWithAggregatesFilter<"Seller"> | string
     avatar?: StringNullableWithAggregatesFilter<"Seller"> | string | null
     businessName?: StringWithAggregatesFilter<"Seller"> | string
+    website?: StringNullableWithAggregatesFilter<"Seller"> | string | null
     category?: StringWithAggregatesFilter<"Seller"> | string
     subcategories?: StringWithAggregatesFilter<"Seller"> | string
     businessAddress?: StringWithAggregatesFilter<"Seller"> | string
     businessCity?: StringWithAggregatesFilter<"Seller"> | string
+    businessState?: StringWithAggregatesFilter<"Seller"> | string
+    businessPincode?: StringWithAggregatesFilter<"Seller"> | string
     businessArea?: StringNullableWithAggregatesFilter<"Seller"> | string | null
     businessLocality?: StringNullableWithAggregatesFilter<"Seller"> | string | null
     businessDescription?: StringNullableWithAggregatesFilter<"Seller"> | string | null
     businessImage?: StringNullableWithAggregatesFilter<"Seller"> | string | null
+    openingHours?: StringNullableWithAggregatesFilter<"Seller"> | string | null
     isVerified?: BoolWithAggregatesFilter<"Seller"> | boolean
     isPromoted?: BoolWithAggregatesFilter<"Seller"> | boolean
     rating?: FloatWithAggregatesFilter<"Seller"> | number
@@ -15566,14 +15643,18 @@ export namespace Prisma {
     password: string
     avatar?: string | null
     businessName: string
+    website?: string | null
     category: string
     subcategories: string
     businessAddress: string
     businessCity: string
+    businessState: string
+    businessPincode: string
     businessArea?: string | null
     businessLocality?: string | null
     businessDescription?: string | null
     businessImage?: string | null
+    openingHours?: string | null
     isVerified?: boolean
     isPromoted?: boolean
     rating?: number
@@ -15594,14 +15675,18 @@ export namespace Prisma {
     password: string
     avatar?: string | null
     businessName: string
+    website?: string | null
     category: string
     subcategories: string
     businessAddress: string
     businessCity: string
+    businessState: string
+    businessPincode: string
     businessArea?: string | null
     businessLocality?: string | null
     businessDescription?: string | null
     businessImage?: string | null
+    openingHours?: string | null
     isVerified?: boolean
     isPromoted?: boolean
     rating?: number
@@ -15621,14 +15706,18 @@ export namespace Prisma {
     password?: StringFieldUpdateOperationsInput | string
     avatar?: NullableStringFieldUpdateOperationsInput | string | null
     businessName?: StringFieldUpdateOperationsInput | string
+    website?: NullableStringFieldUpdateOperationsInput | string | null
     category?: StringFieldUpdateOperationsInput | string
     subcategories?: StringFieldUpdateOperationsInput | string
     businessAddress?: StringFieldUpdateOperationsInput | string
     businessCity?: StringFieldUpdateOperationsInput | string
+    businessState?: StringFieldUpdateOperationsInput | string
+    businessPincode?: StringFieldUpdateOperationsInput | string
     businessArea?: NullableStringFieldUpdateOperationsInput | string | null
     businessLocality?: NullableStringFieldUpdateOperationsInput | string | null
     businessDescription?: NullableStringFieldUpdateOperationsInput | string | null
     businessImage?: NullableStringFieldUpdateOperationsInput | string | null
+    openingHours?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isPromoted?: BoolFieldUpdateOperationsInput | boolean
     rating?: FloatFieldUpdateOperationsInput | number
@@ -15649,14 +15738,18 @@ export namespace Prisma {
     password?: StringFieldUpdateOperationsInput | string
     avatar?: NullableStringFieldUpdateOperationsInput | string | null
     businessName?: StringFieldUpdateOperationsInput | string
+    website?: NullableStringFieldUpdateOperationsInput | string | null
     category?: StringFieldUpdateOperationsInput | string
     subcategories?: StringFieldUpdateOperationsInput | string
     businessAddress?: StringFieldUpdateOperationsInput | string
     businessCity?: StringFieldUpdateOperationsInput | string
+    businessState?: StringFieldUpdateOperationsInput | string
+    businessPincode?: StringFieldUpdateOperationsInput | string
     businessArea?: NullableStringFieldUpdateOperationsInput | string | null
     businessLocality?: NullableStringFieldUpdateOperationsInput | string | null
     businessDescription?: NullableStringFieldUpdateOperationsInput | string | null
     businessImage?: NullableStringFieldUpdateOperationsInput | string | null
+    openingHours?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isPromoted?: BoolFieldUpdateOperationsInput | boolean
     rating?: FloatFieldUpdateOperationsInput | number
@@ -15677,14 +15770,18 @@ export namespace Prisma {
     password: string
     avatar?: string | null
     businessName: string
+    website?: string | null
     category: string
     subcategories: string
     businessAddress: string
     businessCity: string
+    businessState: string
+    businessPincode: string
     businessArea?: string | null
     businessLocality?: string | null
     businessDescription?: string | null
     businessImage?: string | null
+    openingHours?: string | null
     isVerified?: boolean
     isPromoted?: boolean
     rating?: number
@@ -15702,14 +15799,18 @@ export namespace Prisma {
     password?: StringFieldUpdateOperationsInput | string
     avatar?: NullableStringFieldUpdateOperationsInput | string | null
     businessName?: StringFieldUpdateOperationsInput | string
+    website?: NullableStringFieldUpdateOperationsInput | string | null
     category?: StringFieldUpdateOperationsInput | string
     subcategories?: StringFieldUpdateOperationsInput | string
     businessAddress?: StringFieldUpdateOperationsInput | string
     businessCity?: StringFieldUpdateOperationsInput | string
+    businessState?: StringFieldUpdateOperationsInput | string
+    businessPincode?: StringFieldUpdateOperationsInput | string
     businessArea?: NullableStringFieldUpdateOperationsInput | string | null
     businessLocality?: NullableStringFieldUpdateOperationsInput | string | null
     businessDescription?: NullableStringFieldUpdateOperationsInput | string | null
     businessImage?: NullableStringFieldUpdateOperationsInput | string | null
+    openingHours?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isPromoted?: BoolFieldUpdateOperationsInput | boolean
     rating?: FloatFieldUpdateOperationsInput | number
@@ -15728,14 +15829,18 @@ export namespace Prisma {
     password?: StringFieldUpdateOperationsInput | string
     avatar?: NullableStringFieldUpdateOperationsInput | string | null
     businessName?: StringFieldUpdateOperationsInput | string
+    website?: NullableStringFieldUpdateOperationsInput | string | null
     category?: StringFieldUpdateOperationsInput | string
     subcategories?: StringFieldUpdateOperationsInput | string
     businessAddress?: StringFieldUpdateOperationsInput | string
     businessCity?: StringFieldUpdateOperationsInput | string
+    businessState?: StringFieldUpdateOperationsInput | string
+    businessPincode?: StringFieldUpdateOperationsInput | string
     businessArea?: NullableStringFieldUpdateOperationsInput | string | null
     businessLocality?: NullableStringFieldUpdateOperationsInput | string | null
     businessDescription?: NullableStringFieldUpdateOperationsInput | string | null
     businessImage?: NullableStringFieldUpdateOperationsInput | string | null
+    openingHours?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isPromoted?: BoolFieldUpdateOperationsInput | boolean
     rating?: FloatFieldUpdateOperationsInput | number
@@ -16793,14 +16898,18 @@ export namespace Prisma {
     password?: SortOrder
     avatar?: SortOrder
     businessName?: SortOrder
+    website?: SortOrder
     category?: SortOrder
     subcategories?: SortOrder
     businessAddress?: SortOrder
     businessCity?: SortOrder
+    businessState?: SortOrder
+    businessPincode?: SortOrder
     businessArea?: SortOrder
     businessLocality?: SortOrder
     businessDescription?: SortOrder
     businessImage?: SortOrder
+    openingHours?: SortOrder
     isVerified?: SortOrder
     isPromoted?: SortOrder
     rating?: SortOrder
@@ -16825,14 +16934,18 @@ export namespace Prisma {
     password?: SortOrder
     avatar?: SortOrder
     businessName?: SortOrder
+    website?: SortOrder
     category?: SortOrder
     subcategories?: SortOrder
     businessAddress?: SortOrder
     businessCity?: SortOrder
+    businessState?: SortOrder
+    businessPincode?: SortOrder
     businessArea?: SortOrder
     businessLocality?: SortOrder
     businessDescription?: SortOrder
     businessImage?: SortOrder
+    openingHours?: SortOrder
     isVerified?: SortOrder
     isPromoted?: SortOrder
     rating?: SortOrder
@@ -16851,14 +16964,18 @@ export namespace Prisma {
     password?: SortOrder
     avatar?: SortOrder
     businessName?: SortOrder
+    website?: SortOrder
     category?: SortOrder
     subcategories?: SortOrder
     businessAddress?: SortOrder
     businessCity?: SortOrder
+    businessState?: SortOrder
+    businessPincode?: SortOrder
     businessArea?: SortOrder
     businessLocality?: SortOrder
     businessDescription?: SortOrder
     businessImage?: SortOrder
+    openingHours?: SortOrder
     isVerified?: SortOrder
     isPromoted?: SortOrder
     rating?: SortOrder
@@ -19015,14 +19132,18 @@ export namespace Prisma {
     password: string
     avatar?: string | null
     businessName: string
+    website?: string | null
     category: string
     subcategories: string
     businessAddress: string
     businessCity: string
+    businessState: string
+    businessPincode: string
     businessArea?: string | null
     businessLocality?: string | null
     businessDescription?: string | null
     businessImage?: string | null
+    openingHours?: string | null
     isVerified?: boolean
     isPromoted?: boolean
     rating?: number
@@ -19042,14 +19163,18 @@ export namespace Prisma {
     password: string
     avatar?: string | null
     businessName: string
+    website?: string | null
     category: string
     subcategories: string
     businessAddress: string
     businessCity: string
+    businessState: string
+    businessPincode: string
     businessArea?: string | null
     businessLocality?: string | null
     businessDescription?: string | null
     businessImage?: string | null
+    openingHours?: string | null
     isVerified?: boolean
     isPromoted?: boolean
     rating?: number
@@ -19114,14 +19239,18 @@ export namespace Prisma {
     password?: StringFieldUpdateOperationsInput | string
     avatar?: NullableStringFieldUpdateOperationsInput | string | null
     businessName?: StringFieldUpdateOperationsInput | string
+    website?: NullableStringFieldUpdateOperationsInput | string | null
     category?: StringFieldUpdateOperationsInput | string
     subcategories?: StringFieldUpdateOperationsInput | string
     businessAddress?: StringFieldUpdateOperationsInput | string
     businessCity?: StringFieldUpdateOperationsInput | string
+    businessState?: StringFieldUpdateOperationsInput | string
+    businessPincode?: StringFieldUpdateOperationsInput | string
     businessArea?: NullableStringFieldUpdateOperationsInput | string | null
     businessLocality?: NullableStringFieldUpdateOperationsInput | string | null
     businessDescription?: NullableStringFieldUpdateOperationsInput | string | null
     businessImage?: NullableStringFieldUpdateOperationsInput | string | null
+    openingHours?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isPromoted?: BoolFieldUpdateOperationsInput | boolean
     rating?: FloatFieldUpdateOperationsInput | number
@@ -19141,14 +19270,18 @@ export namespace Prisma {
     password?: StringFieldUpdateOperationsInput | string
     avatar?: NullableStringFieldUpdateOperationsInput | string | null
     businessName?: StringFieldUpdateOperationsInput | string
+    website?: NullableStringFieldUpdateOperationsInput | string | null
     category?: StringFieldUpdateOperationsInput | string
     subcategories?: StringFieldUpdateOperationsInput | string
     businessAddress?: StringFieldUpdateOperationsInput | string
     businessCity?: StringFieldUpdateOperationsInput | string
+    businessState?: StringFieldUpdateOperationsInput | string
+    businessPincode?: StringFieldUpdateOperationsInput | string
     businessArea?: NullableStringFieldUpdateOperationsInput | string | null
     businessLocality?: NullableStringFieldUpdateOperationsInput | string | null
     businessDescription?: NullableStringFieldUpdateOperationsInput | string | null
     businessImage?: NullableStringFieldUpdateOperationsInput | string | null
+    openingHours?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isPromoted?: BoolFieldUpdateOperationsInput | boolean
     rating?: FloatFieldUpdateOperationsInput | number
@@ -19800,14 +19933,18 @@ export namespace Prisma {
     password: string
     avatar?: string | null
     businessName: string
+    website?: string | null
     category: string
     subcategories: string
     businessAddress: string
     businessCity: string
+    businessState: string
+    businessPincode: string
     businessArea?: string | null
     businessLocality?: string | null
     businessDescription?: string | null
     businessImage?: string | null
+    openingHours?: string | null
     isVerified?: boolean
     isPromoted?: boolean
     rating?: number
@@ -19827,14 +19964,18 @@ export namespace Prisma {
     password: string
     avatar?: string | null
     businessName: string
+    website?: string | null
     category: string
     subcategories: string
     businessAddress: string
     businessCity: string
+    businessState: string
+    businessPincode: string
     businessArea?: string | null
     businessLocality?: string | null
     businessDescription?: string | null
     businessImage?: string | null
+    openingHours?: string | null
     isVerified?: boolean
     isPromoted?: boolean
     rating?: number
@@ -19935,14 +20076,18 @@ export namespace Prisma {
     password?: StringFieldUpdateOperationsInput | string
     avatar?: NullableStringFieldUpdateOperationsInput | string | null
     businessName?: StringFieldUpdateOperationsInput | string
+    website?: NullableStringFieldUpdateOperationsInput | string | null
     category?: StringFieldUpdateOperationsInput | string
     subcategories?: StringFieldUpdateOperationsInput | string
     businessAddress?: StringFieldUpdateOperationsInput | string
     businessCity?: StringFieldUpdateOperationsInput | string
+    businessState?: StringFieldUpdateOperationsInput | string
+    businessPincode?: StringFieldUpdateOperationsInput | string
     businessArea?: NullableStringFieldUpdateOperationsInput | string | null
     businessLocality?: NullableStringFieldUpdateOperationsInput | string | null
     businessDescription?: NullableStringFieldUpdateOperationsInput | string | null
     businessImage?: NullableStringFieldUpdateOperationsInput | string | null
+    openingHours?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isPromoted?: BoolFieldUpdateOperationsInput | boolean
     rating?: FloatFieldUpdateOperationsInput | number
@@ -19962,14 +20107,18 @@ export namespace Prisma {
     password?: StringFieldUpdateOperationsInput | string
     avatar?: NullableStringFieldUpdateOperationsInput | string | null
     businessName?: StringFieldUpdateOperationsInput | string
+    website?: NullableStringFieldUpdateOperationsInput | string | null
     category?: StringFieldUpdateOperationsInput | string
     subcategories?: StringFieldUpdateOperationsInput | string
     businessAddress?: StringFieldUpdateOperationsInput | string
     businessCity?: StringFieldUpdateOperationsInput | string
+    businessState?: StringFieldUpdateOperationsInput | string
+    businessPincode?: StringFieldUpdateOperationsInput | string
     businessArea?: NullableStringFieldUpdateOperationsInput | string | null
     businessLocality?: NullableStringFieldUpdateOperationsInput | string | null
     businessDescription?: NullableStringFieldUpdateOperationsInput | string | null
     businessImage?: NullableStringFieldUpdateOperationsInput | string | null
+    openingHours?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
     isPromoted?: BoolFieldUpdateOperationsInput | boolean
     rating?: FloatFieldUpdateOperationsInput | number

@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
       subcategories,
       businessAddress,
       businessCity,
+      businessState,
+      businessPincode,
       businessArea,
       businessLocality,
       businessDescription,
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Seller already exists" }, { status: 409 });
       }
 
-      if (!businessName || !category || !businessAddress || !businessCity) {
+      if (!businessName || !category || !businessAddress || !businessCity || !businessState || !businessPincode) {
         return NextResponse.json({ error: "Missing required business fields" }, { status: 400 });
       }
 
@@ -70,6 +72,8 @@ export async function POST(request: NextRequest) {
         subcategories: subcategories ? JSON.stringify(subcategories) : '[]',
         businessAddress,
         businessCity,
+        businessState,
+        businessPincode,
         businessArea,
         businessLocality,
         businessDescription,

@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { User, Store, Truck, Eye, EyeOff } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { setCookie, getUserInfo } from "@/lib/utils"
+import { CATEGORIES, getSubcategoriesByCategory } from "@/utils/category-data";
+import { indianStates, indianStateCityMap } from "@/utils/indian-location-data";
+import SellerSignupForm from "@/components/SellerSignupForm";
 
 interface AuthModalProps {
   isOpen: boolean
@@ -29,9 +32,10 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
     phone: "",
     businessName: "",
     category: "",
-    subcategories: [] as string[],
-    businessAddress: "",
+    subcategory: "",
+    businessState: "",
     businessCity: "",
+    businessAddress: "",
     businessArea: "",
     businessLocality: "",
     businessDescription: "",
@@ -56,9 +60,10 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
       phone: "",
       businessName: "",
       category: "",
-      subcategories: [],
-      businessAddress: "",
+      subcategory: "",
+      businessState: "",
       businessCity: "",
+      businessAddress: "",
       businessArea: "",
       businessLocality: "",
       businessDescription: "",
@@ -121,7 +126,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
     
     // Validate seller-specific fields
     if (mode === "register" && userType === "SELLER") {
-      if (!formData.category || !formData.businessCity || !formData.businessAddress) {
+      if (!formData.businessName || !formData.category || !formData.businessCity || !formData.phone) {
         setErrorMsg("Please fill all required business fields.")
         setIsLoading(false)
         return
@@ -192,11 +197,12 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
             userType,
             ...(userType === "SELLER"
               ? {
-                  businessName: formData.businessName || formData.name,
+                  businessName: formData.businessName,
                   category: formData.category,
-                  subcategories: formData.subcategories || [],
-                  businessAddress: formData.businessAddress,
+                  subcategory: formData.subcategory,
+                  businessState: formData.businessState,
                   businessCity: formData.businessCity,
+                  businessAddress: formData.businessAddress,
                   businessArea: formData.businessArea,
                   businessLocality: formData.businessLocality,
                   businessDescription: formData.businessDescription,
@@ -378,183 +384,181 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
               </TabsContent>
 
               <TabsContent value="register" className="space-y-6">
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Full Name</label>
-                    <Input
-                      name="name"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      className="h-12 text-base"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Email</label>
-                    <Input
-                      name="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className="h-12 text-base"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Phone Number</label>
-                    <Input
-                      name="phone"
-                      type="tel"
-                      placeholder="Enter your phone number"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      className="h-12 text-base"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Password</label>
-                    <div className="relative">
+                {userType === "SELLER" && mode === "register" ? (
+                  <SellerSignupForm onSuccess={handleClose} />
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Full Name</label>
                       <Input
-                        name="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Create a password"
-                        value={formData.password}
+                        name="name"
+                        type="text"
+                        placeholder="Enter your full name"
+                        value={formData.name}
                         onChange={handleInputChange}
-                        className="h-12 text-base pr-12"
+                        className="h-12 text-base"
                         required
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
                     </div>
-                  </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Email</label>
+                      <Input
+                        name="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className="h-12 text-base"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Phone Number</label>
+                      <Input
+                        name="phone"
+                        type="tel"
+                        placeholder="Enter your phone number"
+                        value={formData.phone}
+                        onChange={e => handleInputChange({ target: { name: "phone", value: e.target.value.replace(/[^0-9]/g, "").slice(0, 10) } } as any)}
+                        className="h-12 text-base"
+                        required
+                        maxLength={10}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Password</label>
+                      <div className="relative">
+                        <Input
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Create a password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          className="h-12 text-base pr-12"
+                          required
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
+                    </div>
 
-                  {userType === "SELLER" && (
-                    <>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Business Name</label>
-                        <Input
-                          name="businessName"
-                          type="text"
-                          placeholder="Enter your business name"
-                          value={formData.businessName}
-                          onChange={handleInputChange}
-                          className="h-12 text-base"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Business Category</label>
-                        <Input
-                          name="category"
-                          type="text"
-                          placeholder="e.g., food-beverage, electronics-appliances"
-                          value={formData.category}
-                          onChange={handleInputChange}
-                          className="h-12 text-base"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Business Address</label>
-                        <Input
-                          name="businessAddress"
-                          type="text"
-                          placeholder="Enter your business address"
-                          value={formData.businessAddress}
-                          onChange={handleInputChange}
-                          className="h-12 text-base"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">City</label>
-                        <Input
-                          name="businessCity"
-                          type="text"
-                          placeholder="Enter your city"
-                          value={formData.businessCity}
-                          onChange={handleInputChange}
-                          className="h-12 text-base"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Area</label>
-                        <Input
-                          name="businessArea"
-                          type="text"
-                          placeholder="Enter your area"
-                          value={formData.businessArea}
-                          onChange={handleInputChange}
-                          className="h-12 text-base"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Locality</label>
-                        <Input
-                          name="businessLocality"
-                          type="text"
-                          placeholder="Enter your locality"
-                          value={formData.businessLocality}
-                          onChange={handleInputChange}
-                          className="h-12 text-base"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Business Description</label>
-                        <Input
-                          name="businessDescription"
-                          type="text"
-                          placeholder="Brief description of your business"
-                          value={formData.businessDescription}
-                          onChange={handleInputChange}
-                          className="h-12 text-base"
-                        />
-                      </div>
-                    </>
-                  )}
+                    {userType === "SELLER" && (
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Business Name <span className="text-red-500">*</span></label>
+                          <Input
+                            name="businessName"
+                            type="text"
+                            placeholder="Enter your business name"
+                            value={formData.businessName}
+                            onChange={handleInputChange}
+                            className="h-12 text-base"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Category <span className="text-red-500">*</span></label>
+                          <select
+                            name="category"
+                            value={formData.category}
+                            onChange={e => {
+                              handleInputChange({ target: { name: "category", value: e.target.value } } as any);
+                              handleInputChange({ target: { name: "subcategory", value: "" } } as any);
+                            }}
+                            required
+                            className="w-full border rounded px-2 py-2 h-12 text-base"
+                          >
+                            <option value="">Select Category</option>
+                            {CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Subcategory <span className="text-red-500">*</span></label>
+                          <select
+                            name="subcategory"
+                            value={formData.subcategory}
+                            onChange={handleInputChange}
+                            required
+                            className="w-full border rounded px-2 py-2 h-12 text-base"
+                            disabled={!formData.category}
+                          >
+                            <option value="">{formData.category ? "Select Subcategory" : "Select Category first"}</option>
+                            {formData.category && getSubcategoriesByCategory(formData.category).map((sub: string) => <option key={sub} value={sub}>{sub}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">State <span className="text-red-500">*</span></label>
+                          <select
+                            name="businessState"
+                            value={formData.businessState}
+                            onChange={e => {
+                              handleInputChange({ target: { name: "businessState", value: e.target.value } } as any);
+                              handleInputChange({ target: { name: "businessCity", value: "" } } as any);
+                            }}
+                            required
+                            className="w-full border rounded px-2 py-2 h-12 text-base"
+                          >
+                            <option value="">Select State</option>
+                            {indianStates.map(state => <option key={state} value={state}>{state}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">City <span className="text-red-500">*</span></label>
+                          <select
+                            name="businessCity"
+                            value={formData.businessCity}
+                            onChange={handleInputChange}
+                            required
+                            className="w-full border rounded px-2 py-2 h-12 text-base"
+                            disabled={!formData.businessState}
+                          >
+                            <option value="">{formData.businessState ? "Select City" : "Select State first"}</option>
+                            {formData.businessState && indianStateCityMap[formData.businessState]?.map((city: string) => <option key={city} value={city}>{city}</option>)}
+                          </select>
+                        </div>
+                      </>
+                    )}
 
-                  {userType === "DELIVERY_AGENT" && (
-                    <>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Vehicle Number</label>
-                        <Input
-                          name="vehicleNumber"
-                          type="text"
-                          placeholder="Enter your vehicle number"
-                          value={formData.vehicleNumber}
-                          onChange={handleInputChange}
-                          className="h-12 text-base"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Vehicle Type</label>
-                        <Input
-                          name="vehicleType"
-                          type="text"
-                          placeholder="e.g., Motorcycle, Car, Bicycle"
-                          value={formData.vehicleType}
-                          onChange={handleInputChange}
-                          className="h-12 text-base"
-                          required
-                        />
-                      </div>
-                    </>
-                  )}
+                    {userType === "DELIVERY_AGENT" && (
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Vehicle Number</label>
+                          <Input
+                            name="vehicleNumber"
+                            type="text"
+                            placeholder="Enter your vehicle number"
+                            value={formData.vehicleNumber}
+                            onChange={handleInputChange}
+                            className="h-12 text-base"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Vehicle Type</label>
+                          <Input
+                            name="vehicleType"
+                            type="text"
+                            placeholder="e.g., Motorcycle, Car, Bicycle"
+                            value={formData.vehicleType}
+                            onChange={handleInputChange}
+                            className="h-12 text-base"
+                            required
+                          />
+                        </div>
+                      </>
+                    )}
 
-                  <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
-                    {isLoading ? "Creating Account..." : "Create Account"}
-                  </Button>
-                </form>
+                    <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
+                      {isLoading ? "Creating Account..." : "Create Account"}
+                    </Button>
+                  </form>
+                )}
               </TabsContent>
             </Tabs>
 

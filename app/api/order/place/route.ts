@@ -100,23 +100,23 @@ export async function POST(request: NextRequest) {
       involvedSellerIds.push(sellerId)
     }
 
-    // Create payment record
-    const paymentStatus = paymentMethod.toUpperCase() === 'CASH_ON_DELIVERY' ? 'PENDING' : 'COMPLETED'
-    
-    const payment = await createPayment({
-      orderId: order.id,
-      customerId: Number(customerId),
-      amount: totalAmount,
-      paymentMethod: paymentMethod.toUpperCase() as 'CASH_ON_DELIVERY' | 'ONLINE_PAYMENT' | 'WALLET',
-      transactionId: paymentMethod.toUpperCase() !== 'CASH_ON_DELIVERY' ? `TXN-${Date.now()}` : undefined,
-      gateway: paymentMethod.toUpperCase() !== 'CASH_ON_DELIVERY' ? 'PAYMENT_GATEWAY' : undefined
-    })
-
-    // Update order payment status
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { paymentStatus: paymentStatus as 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' }
-    })
+    // Only create payment record if paymentMethod is not PENDING
+    if (paymentMethod.toUpperCase() !== 'PENDING') {
+      const paymentStatus = paymentMethod.toUpperCase() === 'CASH_ON_DELIVERY' ? 'PENDING' : 'COMPLETED'
+      await createPayment({
+        orderId: order.id,
+        customerId: Number(customerId),
+        amount: totalAmount,
+        paymentMethod: paymentMethod.toUpperCase() as 'CASH_ON_DELIVERY' | 'ONLINE_PAYMENT' | 'WALLET',
+        transactionId: paymentMethod.toUpperCase() !== 'CASH_ON_DELIVERY' ? `TXN-${Date.now()}` : undefined,
+        gateway: paymentMethod.toUpperCase() !== 'CASH_ON_DELIVERY' ? 'PAYMENT_GATEWAY' : undefined
+      })
+      // Update order payment status
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { paymentStatus: paymentStatus as 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' }
+      })
+    }
 
     // Create initial tracking entry
     await prisma.orderTracking.create({
@@ -231,7 +231,12 @@ export async function GET(request: NextRequest) {
       if (!order) {
         return NextResponse.json({ error: "Order not found" }, { status: 404 })
       }
-      return NextResponse.json({ order })
+      // Hide 'PENDING' payment method from user-facing response
+      const userOrder = {
+        ...order,
+        paymentMethod: order.paymentMethod === 'PENDING' ? '' : order.paymentMethod
+      }
+      return NextResponse.json({ order: userOrder })
     }
     
     if (customerId) {
@@ -342,6 +347,8 @@ export async function PATCH(request: NextRequest) {
     const { 
       orderStatus, 
       paymentStatus, 
+      paymentMethod, 
+      paymentDetails, 
       deliveryAgentId,
       estimatedDeliveryTime,
       actualDeliveryTime
@@ -350,6 +357,7 @@ export async function PATCH(request: NextRequest) {
     const updateData: any = {
       ...(orderStatus && { orderStatus }),
       ...(paymentStatus && { paymentStatus }),
+      ...(paymentMethod && { paymentMethod }),
       ...(deliveryAgentId && { deliveryAgentId: Number(deliveryAgentId) }),
       ...(estimatedDeliveryTime && { estimatedDeliveryTime: new Date(estimatedDeliveryTime) }),
       ...(actualDeliveryTime && { actualDeliveryTime: new Date(actualDeliveryTime) })
@@ -369,6 +377,23 @@ export async function PATCH(request: NextRequest) {
         payments: true
       }
     })
+
+    // If paymentMethod and paymentDetails are provided, create a payment record
+    if (paymentMethod && paymentDetails) {
+      await createPayment({
+        orderId: order.id,
+        customerId: order.customerId,
+        amount: order.totalAmount,
+        paymentMethod: paymentMethod.toUpperCase(),
+        transactionId: paymentDetails.utrNumber || paymentDetails.cardLast4 || paymentDetails.walletUtr || `TXN-${Date.now()}`,
+        gateway: paymentMethod.toUpperCase() !== 'CASH_ON_DELIVERY' ? 'PAYMENT_GATEWAY' : undefined
+      })
+      // Update order payment status
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { paymentStatus: paymentMethod.toUpperCase() === 'CASH_ON_DELIVERY' ? 'PENDING' : 'COMPLETED' }
+      })
+    }
 
     // Create tracking entry for status change
     if (orderStatus) {

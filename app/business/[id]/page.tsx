@@ -115,108 +115,25 @@ export default function BusinessPage() {
         </div>
 
         {/* Business Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="lg:w-1/3">
-              <img
-                src={business.image || "/placeholder.svg"}
-                alt={business.name}
-                className="w-full h-64 object-cover rounded-lg"
-              />
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex flex-col md:flex-row md:items-center md:gap-6">
+          <img
+            src={business.image || "/placeholder.svg"}
+            alt={business.name}
+            className="w-28 h-28 object-cover rounded-lg mb-4 md:mb-0 md:mr-6 border"
+          />
+          <div className="flex-1 flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-bold text-gray-900">{business.name}</h1>
+              <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium text-gray-700">{business.categoryName}</span>
+              {business.subcategory && (
+                <span className="px-2 py-1 bg-gray-50 rounded text-xs font-medium text-gray-500">{business.subcategory}</span>
+              )}
             </div>
-
-            <div className="lg:w-2/3">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">{business.name}</h1>
-                  <div className="flex items-center gap-4 mb-2">
-                    <Badge variant="secondary">{business.category}</Badge>
-                    <Badge variant="outline">{business.subcategory}</Badge>
-                    <span className={`text-sm font-medium ${business.isOpen ? "text-green-600" : "text-red-600"}`}>
-                      {business.isOpen ? "Open" : "Closed"}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1 text-sm text-gray-600 mb-4">
-                    <div className="flex items-center gap-1">
-                      <span className="font-semibold">Owner:</span>
-                      <span>{business.ownerName || '-'}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="font-semibold">Email:</span>
-                      <span>{business.email || '-'}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="font-semibold">Phone:</span>
-                      <span>{business.phone || '-'}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="font-semibold">City:</span>
-                      <span>{business.city || '-'}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="font-semibold">Address:</span>
-                      <span>{business.location || '-'}</span>
-                    </div>
-                    {business.area && (
-                      <div className="flex items-center gap-1">
-                        <span className="font-semibold">Area:</span>
-                        <span>{business.area}</span>
-                      </div>
-                    )}
-                    {business.locality && (
-                      <div className="flex items-center gap-1">
-                        <span className="font-semibold">Locality:</span>
-                        <span>{business.locality}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                    <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                      <span className="font-medium">{business.rating}</span>
-                      <span>({business.reviews} reviews)</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{business.deliveryTime}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Navigation className="h-4 w-4" />
-                      <span>{business.distance}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <Heart className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <p className="text-gray-600 mb-4">{business.description}</p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-gray-400" />
-                  <span>{business.location}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-gray-400" />
-                  <span>{business.phone}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Globe className="h-4 w-4 text-gray-400" />
-                  <span>{business.website}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="h-4 w-4 text-gray-400" />
-                  <span>Delivery in {business.deliveryTime}</span>
-                </div>
-              </div>
+            <div className="flex flex-wrap gap-4 text-sm text-gray-700">
+              <div><span className="font-semibold">State:</span> {business.state || '-'}</div>
+              <div><span className="font-semibold">City:</span> {business.city || '-'}</div>
+              <div><span className="font-semibold">Phone:</span> {business.phone || '-'}</div>
+              {business.email && <div><span className="font-semibold">Email:</span> {business.email}</div>}
             </div>
           </div>
         </div>

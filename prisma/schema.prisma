@@ -40,6 +40,7 @@ enum PaymentStatus {
 }
 
 enum PaymentMethod {
+  PENDING
   CASH_ON_DELIVERY
   ONLINE_PAYMENT
   WALLET
@@ -66,34 +67,35 @@ model Customer {
 // Seller table
 model Seller {
   id        Int      @id @default(autoincrement())
-  name      String
+  name      String   // Seller's personal name (Mandatory)
   email     String   @unique
   phone     String?
   password  String
   avatar    String?
-  
-  // Business specific fields
-  businessName    String
-  category        String  // Main business category (single selection)
-  subcategories   String  // JSON array of subcategories (multiple selection)
+
+  businessName    String   // Seller’s store or brand name (Mandatory)
+  website         String?  // Optional website
+  category        String
+  subcategories   String
   businessAddress String
   businessCity    String
+  businessState   String   // New: State (Mandatory)
+  businessPincode String   // New: Pincode (Mandatory, 6 digits)
   businessArea    String?
   businessLocality String?
   businessDescription String?
   businessImage   String?
+  openingHours    String?  // New: Opening hours placeholder
   isVerified      Boolean @default(false)
   isPromoted      Boolean @default(false)
   rating          Float   @default(0)
   totalReviews    Int     @default(0)
   deliveryTime    String?
   isOpen          Boolean @default(true)
-  
-  // Common fields
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  // Relations
+
   products     Product[]
   sellerOrders SellerOrder[]
 }

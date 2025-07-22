@@ -123,6 +123,22 @@ export default function PaymentPage() {
     return true
   }
 
+  const mapPaymentMethod = (method) => {
+    switch (method) {
+      case "upi_online":
+      case "card":
+      case "netbanking":
+        return "ONLINE_PAYMENT"
+      case "wallet":
+        return "WALLET"
+      case "cod":
+      case "upi_on_delivery":
+        return "CASH_ON_DELIVERY"
+      default:
+        return method
+    }
+  }
+
   const placeOrder = async () => {
     if (!selectedPaymentMethod || !orderDetails || !orderId) return
     if (["upi_online", "card", "netbanking", "wallet"].includes(selectedPaymentMethod) && !validatePaymentDetails()) {
@@ -136,7 +152,7 @@ export default function PaymentPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          paymentMethod: selectedPaymentMethod,
+          paymentMethod: mapPaymentMethod(selectedPaymentMethod),
           paymentDetails: {
             upiId: selectedPaymentMethod === "upi_online" ? upiId : undefined,
             utrNumber:
@@ -151,6 +167,8 @@ export default function PaymentPage() {
             bankName: selectedPaymentMethod === "netbanking" ? selectedBank : undefined,
             walletName: selectedPaymentMethod === "wallet" ? selectedWallet : undefined,
           },
+          // Set orderStatus to CONFIRMED if payment is completed (for online payments)
+          orderStatus: ["upi_online", "card", "netbanking", "wallet"].includes(selectedPaymentMethod) ? "CONFIRMED" : undefined,
         }),
       })
       const data = await res.json()

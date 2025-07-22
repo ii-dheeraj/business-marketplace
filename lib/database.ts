@@ -29,6 +29,8 @@ export const createSeller = async (data: {
   subcategories: string
   businessAddress: string
   businessCity: string
+  businessState: string
+  businessPincode: string
   businessArea?: string
   businessLocality?: string
   businessDescription?: string
@@ -145,11 +147,10 @@ export const createOrder = async (data: {
   deliveryInstructions?: string
   items: any[]
 }) => {
-  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-  
-  return await prisma.order.create({
+  // Step 1: Create order without orderNumber
+  const order = await prisma.order.create({
     data: {
-      orderNumber,
+      orderNumber: "temp", // Temporary, will update after creation
       customerId: data.customerId,
       customerName: data.customerName,
       customerPhone: data.customerPhone,
@@ -163,6 +164,7 @@ export const createOrder = async (data: {
       totalAmount: data.totalAmount,
       paymentMethod: data.paymentMethod as any,
       deliveryInstructions: data.deliveryInstructions,
+      orderStatus: "CONFIRMED",
       items: {
         create: data.items.map(item => ({
           productId: item.productId,
@@ -180,6 +182,16 @@ export const createOrder = async (data: {
       customer: true
     }
   })
+  // Step 2: Update orderNumber to be the running id
+  const updatedOrder = await prisma.order.update({
+    where: { id: order.id },
+    data: { orderNumber: order.id.toString() },
+    include: {
+      items: true,
+      customer: true
+    }
+  })
+  return updatedOrder
 }
 
 export const createSellerOrder = async (data: {
