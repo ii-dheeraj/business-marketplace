@@ -136,6 +136,40 @@ export default function BusinessPage() {
                       {business.isOpen ? "Open" : "Closed"}
                     </span>
                   </div>
+                  <div className="flex flex-col gap-1 text-sm text-gray-600 mb-4">
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold">Owner:</span>
+                      <span>{business.ownerName || '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold">Email:</span>
+                      <span>{business.email || '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold">Phone:</span>
+                      <span>{business.phone || '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold">City:</span>
+                      <span>{business.city || '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold">Address:</span>
+                      <span>{business.location || '-'}</span>
+                    </div>
+                    {business.area && (
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold">Area:</span>
+                        <span>{business.area}</span>
+                      </div>
+                    )}
+                    {business.locality && (
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold">Locality:</span>
+                        <span>{business.locality}</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
                     <div className="flex items-center gap-1">
                       <Star className="h-4 w-4 text-yellow-500 fill-current" />

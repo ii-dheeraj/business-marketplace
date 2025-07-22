@@ -30,19 +30,23 @@ export async function GET(request: NextRequest) {
       // Format business data for frontend
       const formattedBusiness = {
         id: business.id,
-        name: business.businessName,
+        name: business.businessName || business.name,
+        ownerName: business.name || '',
+        email: business.email || '',
+        phone: business.phone || '',
         category: business.category,
         subcategories: subcategories,
         categoryName: getCategoryById(business.category)?.name || business.category,
-        description: business.businessDescription || "",
-        image: business.businessImage || "/placeholder.svg",
-        location: business.businessAddress,
-        phone: business.phone || "",
-        website: "", // Add if needed
+        description: business.businessDescription || '',
+        image: business.businessImage || '/placeholder.svg',
+        location: business.businessAddress || '',
+        city: business.businessCity || '',
+        area: business.businessArea || '',
+        locality: business.businessLocality || '',
         rating: business.rating,
         reviews: business.totalReviews,
-        deliveryTime: business.deliveryTime || "30-45 min",
-        distance: "2.5 km", // Placeholder - can be calculated based on location
+        deliveryTime: business.deliveryTime || '30-45 min',
+        distance: '2.5 km', // Placeholder - can be calculated based on location
         isOpen: business.isOpen,
         isVerified: business.isVerified,
         isPromoted: business.isPromoted,

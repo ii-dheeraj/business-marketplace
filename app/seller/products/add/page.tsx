@@ -61,6 +61,7 @@ export default function AddProduct() {
   const [images, setImages] = useState<ProductImage[]>([])
   const [currentTag, setCurrentTag] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [error, setError] = useState("");
 
   const categories = [
     "Electronics",
@@ -162,8 +163,9 @@ export default function AddProduct() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!sellerInfo) return
+    e.preventDefault();
+    setError("");
+    if (!sellerInfo) return;
     const payload = {
       ...productData,
       subcategories: productData.subcategories.join(","),
@@ -181,15 +183,16 @@ export default function AddProduct() {
         image: images[0]?.url || "",
         sellerId: sellerInfo.id,
       }),
-    })
-    const data = await res.json()
+    });
+    const data = await res.json();
     if (res.ok) {
-      setAddedProducts((prev) => [...prev, data.product])
-      setProductData({ name: "", description: "", category: "", price: "", stock: "", tags: [], subcategories: [] })
-      setImages([])
-      router.push("/seller/products/add/success")
+      setAddedProducts((prev) => [...prev, data.product]);
+      setProductData({ name: "", description: "", category: "", price: "", stock: "", tags: [], subcategories: [] });
+      setImages([]);
+      router.push("/seller/products/add/success");
     } else {
-      alert(data.error || "Failed to add product")
+      setError(data.error || "Failed to add product");
+      console.error("Add product error:", data.error);
     }
   }
 
@@ -226,6 +229,7 @@ export default function AddProduct() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
+                {error && <div className="text-red-600 mb-2">{error}</div>}
                 {/* Product Name */}
                 <div className="space-y-2">
                   <Label htmlFor="name">Product Name *</Label>

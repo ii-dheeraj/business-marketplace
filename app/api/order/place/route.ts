@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
 
     // Create seller orders for each seller
     const sellerOrders = []
+    const involvedSellerIds = []
     for (const [sellerId, sellerItems] of itemsBySeller) {
       const sellerSubtotal = sellerItems.reduce((sum: number, item: any) => sum + item.totalPrice, 0)
       const commission = sellerSubtotal * 0.05 // 5% commission
@@ -96,6 +97,7 @@ export async function POST(request: NextRequest) {
       })
       
       sellerOrders.push(sellerOrder)
+      involvedSellerIds.push(sellerId)
     }
 
     // Create payment record
@@ -165,6 +167,22 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error("Error sending real-time notifications:", error)
       // Don't fail the order if notifications fail
+    }
+
+    // Send real-time notification to all involved sellers
+    for (const sellerId of involvedSellerIds) {
+      try {
+        await realtimeManager.sendNotification(String(sellerId), {
+          type: 'notification',
+          title: 'Order Placed',
+          message: `A new order (ID: ${order.id}) was placed including your products.`,
+          data: { orderId: order.id },
+          timestamp: new Date(),
+          userId: String(sellerId)
+        })
+      } catch (notifyErr) {
+        console.error("[API] Failed to send real-time order notification to seller:", sellerId, notifyErr)
+      }
     }
 
     return NextResponse.json({

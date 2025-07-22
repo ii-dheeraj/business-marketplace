@@ -38,6 +38,20 @@ export async function POST(request: NextRequest) {
       },
     })
     
+    // Send real-time notification to seller
+    try {
+      await realtimeManager.sendNotification(String(sellerId), {
+        type: 'notification',
+        title: 'Product Added',
+        message: `A new product (ID: ${product.id}) was added.`,
+        data: product,
+        timestamp: new Date(),
+        userId: String(sellerId)
+      })
+    } catch (notifyErr) {
+      console.error("[API] Failed to send real-time notification to seller:", sellerId, notifyErr)
+    }
+    
     return NextResponse.json({ success: true, product })
   } catch (error) {
     console.error("Error adding product:", error)
@@ -54,13 +68,18 @@ export async function GET(request: NextRequest) {
   const skip = (page - 1) * limit
   
   try {
+    if (sellerId && isNaN(Number(sellerId))) {
+      console.error("Invalid sellerId provided to /api/product:", sellerId)
+      return NextResponse.json({ error: "Invalid sellerId" }, { status: 400 })
+    }
+    console.log("[API] Fetching products for sellerId:", sellerId)
     // Optimized query with pagination and minimal includes
     const [products, totalCount] = await Promise.all([
       prisma.product.findMany({
-      where: {
-        ...(sellerId ? { sellerId: Number(sellerId) } : {}),
-        isActive: true
-      },
+        where: {
+          ...(sellerId ? { sellerId: Number(sellerId) } : {}),
+          isActive: true
+        },
         select: {
           id: true,
           name: true,
@@ -76,14 +95,14 @@ export async function GET(request: NextRequest) {
           sellerId: true,
           createdAt: true,
           updatedAt: true,
-        seller: {
-          select: {
-            id: true,
-            name: true,
-            businessName: true,
-            businessCategory: true
+          seller: {
+            select: {
+              id: true,
+              name: true,
+              businessName: true,
+              businessCity: true // fixed from businessCategory
+            }
           }
-        }
         },
         skip,
         take: limit,
@@ -95,8 +114,8 @@ export async function GET(request: NextRequest) {
         where: {
           ...(sellerId ? { sellerId: Number(sellerId) } : {}),
           isActive: true
-      }
-    })
+        }
+      })
     ])
     
     return NextResponse.json({ 
@@ -109,8 +128,8 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error("Error fetching products:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[API] Error fetching products for sellerId:", sellerId, error)
+    return NextResponse.json({ error: "Internal server error", details: error?.message }, { status: 500 })
   }
 }
 

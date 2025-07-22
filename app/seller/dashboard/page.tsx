@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,50 +39,9 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { getCookie, deleteCookie } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast";
 
-// Mock data for demonstration
-const mockProducts = [
-  {
-    id: 1,
-    name: "Wireless Headphones",
-    price: 2999,
-    stock: 25,
-    category: "Electronics",
-    status: "active",
-    image: "/placeholder.svg?height=50&width=50",
-    sales: 45,
-  },
-  {
-    id: 2,
-    name: "Smartphone Case",
-    price: 599,
-    stock: 100,
-    category: "Accessories",
-    status: "active",
-    image: "/placeholder.svg?height=50&width=50",
-    sales: 78,
-  },
-  {
-    id: 3,
-    name: "Bluetooth Speaker",
-    price: 1999,
-    stock: 0,
-    category: "Electronics",
-    status: "out_of_stock",
-    image: "/placeholder.svg?height=50&width=50",
-    sales: 23,
-  },
-  {
-    id: 4,
-    name: "Phone Charger",
-    price: 899,
-    stock: 50,
-    category: "Accessories",
-    status: "active",
-    image: "/placeholder.svg?height=50&width=50",
-    sales: 67,
-  },
-]
+// Remove mockProducts array and any references to it
 
 export default function SellerDashboard() {
   const [sellerInfo, setSellerInfo] = useState<any>(null)
@@ -97,20 +56,59 @@ export default function SellerDashboard() {
   const [editForm, setEditForm] = useState<any>({})
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const { toast } = useToast();
+  const [profileForm, setProfileForm] = useState<any>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  useEffect(() => {
+    if (sellerInfo) {
+      setProfileForm({ ...sellerInfo });
+    }
+  }, [sellerInfo]);
+
+  const handleProfileInputChange = (field: string, value: any) => {
+    setProfileForm((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      const res = await fetch("/api/seller/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileForm),
+      });
+      const data = await res.json();
+      if (res.ok && data.seller) {
+        setSellerInfo(data.seller);
+        setProfileForm(data.seller);
+        toast({ title: "Profile updated successfully!" });
+      } else {
+        toast({ title: "Failed to update profile", description: data.error || "Unknown error", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Failed to update profile", description: String(error), variant: "destructive" });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   // Optimized data fetching with loading states
   const fetchProducts = async (page = 1) => {
     if (!sellerInfo) return
     setIsLoadingProducts(true)
     try {
-      const res = await fetch(`/api/product?sellerId=${sellerInfo.id}&page=${page}&limit=10`)
+      const apiUrl = `/api/product?sellerId=${sellerInfo.id}&page=${page}&limit=10`;
+      console.log("[SellerDashboard] Fetching products for sellerId:", sellerInfo.id, "URL:", apiUrl);
+      const res = await fetch(apiUrl)
       const data = await res.json()
-      console.log("Fetched products:", data.products)
+      console.log("[SellerDashboard] Products fetched:", data.products)
       setProducts(data.products || [])
       setTotalPages(data.pagination?.totalPages || 1)
       setCurrentPage(page)
     } catch (error) {
-      console.error("Error fetching products:", error)
+      console.error("[SellerDashboard] Error fetching products:", error)
     } finally {
       setIsLoadingProducts(false)
     }
@@ -120,12 +118,14 @@ export default function SellerDashboard() {
     if (!sellerInfo) return
     setIsLoadingOrders(true)
     try {
-      const res = await fetch(`/api/seller/orders?sellerId=${sellerInfo.id}&page=${page}&limit=10`)
+      const apiUrl = `/api/seller/orders?sellerId=${sellerInfo.id}&page=${page}&limit=10`;
+      console.log("[SellerDashboard] Fetching orders for sellerId:", sellerInfo.id, "URL:", apiUrl);
+      const res = await fetch(apiUrl)
       const data = await res.json()
-      console.log("Fetched seller orders:", data.orders) // Debug log
+      console.log("[SellerDashboard] Orders fetched:", data.orders)
       setOrders(data.orders || [])
     } catch (error) {
-      console.error("Error fetching orders:", error)
+      console.error("[SellerDashboard] Error fetching orders:", error)
     } finally {
       setIsLoadingOrders(false)
     }
@@ -153,8 +153,34 @@ export default function SellerDashboard() {
     if (sellerInfo && sellerInfo.id) {
       fetchProducts(1)
       fetchOrders(1)
+      // Set up SSE for real-time product and order updates
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+      const eventSource = new EventSource(`/api/realtime/notifications?userId=${sellerInfo.id}`);
+      eventSourceRef.current = eventSource;
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'notification' && data.title) {
+            if (data.title.toLowerCase().includes('product')) {
+              fetchProducts(currentPage);
+            } else if (data.title.toLowerCase().includes('order')) {
+              fetchOrders(currentPage);
+            }
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      };
+      eventSource.onerror = (error) => {
+        eventSource.close();
+      };
+      return () => {
+        eventSource.close();
+      };
     }
-  }, [sellerInfo])
+  }, [sellerInfo, currentPage]);
 
   // Handle tab changes with optimized data loading
   const handleTabChange = (tab: string) => {
@@ -435,10 +461,10 @@ export default function SellerDashboard() {
                             </TableCell>
                           </TableRow>
                         ))
-                      ) : products.length === 0 ? (
+                      ) : products.length === 0 && !isLoadingProducts ? (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                            No products found. Add your first product to get started!
+                            No products found for this seller. Please check if your products have the correct sellerId in the database.
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -727,7 +753,7 @@ export default function SellerDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {mockProducts
+                    {products
                       .sort((a, b) => b.sales - a.sales)
                       .slice(0, 3)
                       .map((product) => (
@@ -753,74 +779,58 @@ export default function SellerDashboard() {
 
           {/* Profile Tab */}
           <TabsContent value="profile" className="space-y-6">
-            <h2 className="text-xl sm:text-2xl font-bold">Business Profile</h2>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4">Edit Profile</h2>
+            {profileForm && (
               <Card>
-                <CardHeader>
-                  <CardTitle>Business Information</CardTitle>
-                  <CardDescription>Manage your business details</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarImage src="/placeholder.svg" />
-                      <AvatarFallback>
-                        {sellerInfo.businessName?.charAt(0) || sellerInfo.name?.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
+                <CardContent className="py-6 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <h3 className="text-lg font-semibold">{sellerInfo.businessName || sellerInfo.name}</h3>
-                      <p className="text-gray-600">{sellerInfo.businessCategory || "General"}</p>
+                      <Label htmlFor="profile-name">Name</Label>
+                      <Input id="profile-name" value={profileForm.name || ""} onChange={e => handleProfileInputChange("name", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-email">Email</Label>
+                      <Input id="profile-email" value={profileForm.email || ""} onChange={e => handleProfileInputChange("email", e.target.value)} type="email" />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-phone">Phone</Label>
+                      <Input id="profile-phone" value={profileForm.phone || ""} onChange={e => handleProfileInputChange("phone", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-businessName">Business Name</Label>
+                      <Input id="profile-businessName" value={profileForm.businessName || ""} onChange={e => handleProfileInputChange("businessName", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-businessAddress">Business Address</Label>
+                      <Input id="profile-businessAddress" value={profileForm.businessAddress || ""} onChange={e => handleProfileInputChange("businessAddress", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-businessCity">Business City</Label>
+                      <Input id="profile-businessCity" value={profileForm.businessCity || ""} onChange={e => handleProfileInputChange("businessCity", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-businessArea">Business Area</Label>
+                      <Input id="profile-businessArea" value={profileForm.businessArea || ""} onChange={e => handleProfileInputChange("businessArea", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-businessLocality">Business Locality</Label>
+                      <Input id="profile-businessLocality" value={profileForm.businessLocality || ""} onChange={e => handleProfileInputChange("businessLocality", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-businessDescription">Business Description</Label>
+                      <Input id="profile-businessDescription" value={profileForm.businessDescription || ""} onChange={e => handleProfileInputChange("businessDescription", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="profile-businessImage">Business Image URL</Label>
+                      <Input id="profile-businessImage" value={profileForm.businessImage || ""} onChange={e => handleProfileInputChange("businessImage", e.target.value)} />
                     </div>
                   </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm">{sellerInfo.email}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm">{sellerInfo.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm">{sellerInfo.businessAddress || "Address not provided"}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm">Joined {new Date(sellerInfo.createdAt).toLocaleDateString()}</span>
-                    </div>
+                  <div className="flex gap-2 justify-end mt-4">
+                    <Button onClick={handleSaveProfile} disabled={isSavingProfile}>{isSavingProfile ? "Saving..." : "Save Changes"}</Button>
                   </div>
-
-                  <Button className="w-full">
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Profile
-                  </Button>
                 </CardContent>
               </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Business Hours</CardTitle>
-                  <CardDescription>Set your operating hours</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
-                      <div key={day} className="flex justify-between items-center">
-                        <span className="text-sm font-medium">{day}</span>
-                        <span className="text-sm text-gray-600">9:00 AM - 6:00 PM</span>
-                      </div>
-                    ))}
-                  </div>
-                  <Button variant="outline" className="w-full mt-4 bg-transparent">
-                    Update Hours
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+            )}
           </TabsContent>
 
           {/* Settings Tab */}
