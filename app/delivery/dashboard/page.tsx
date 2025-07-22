@@ -20,9 +20,11 @@ export default function DeliveryDashboard() {
   const [activeTab, setActiveTab] = useState("available")
   const [availableOrders, setAvailableOrders] = useState<any[]>([])
   const [activeDeliveries, setActiveDeliveries] = useState<any[]>([])
+  const [deliveryHistory, setDeliveryHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [agentName, setAgentName] = useState<string>("")
+  const [agentId, setAgentId] = useState<number | null>(null)
   const [stats, setStats] = useState<any>({ totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
 
   useEffect(() => {
@@ -33,6 +35,7 @@ export default function DeliveryDashboard() {
       try {
         const user = JSON.parse(userInfoCookie)
         setAgentName(user.name || "")
+        setAgentId(user.id)
         deliveryAgentId = user.id
       } catch {}
     }
@@ -57,17 +60,77 @@ export default function DeliveryDashboard() {
         setLoading(false)
       }
     }
+    const fetchHistory = async () => {
+      if (!deliveryAgentId) return
+      try {
+        const res = await fetch(`/api/order/place?deliveryAgentId=${deliveryAgentId}&status=DELIVERED`)
+        const data = await res.json()
+        if (res.ok && data.orders) {
+          setDeliveryHistory(data.orders)
+        }
+      } catch {}
+    }
     fetchOrders()
+    fetchHistory()
   }, [])
 
-  const handleAcceptOrder = (orderId: string) => {
-    console.log("Accepting order:", orderId)
-    // Handle order acceptance logic
+  const refreshOrders = async () => {
+    if (!agentId) return
+    setLoading(true)
+    setError("")
+    try {
+      const url = `/api/delivery/orders?deliveryAgentId=${agentId}`
+      const res = await fetch(url)
+      const data = await res.json()
+      if (res.ok) {
+        setAvailableOrders(data.availableOrders || [])
+        setActiveDeliveries(data.activeDeliveries || [])
+        setStats(data.stats || { totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
+      } else {
+        setError(data.error || "Failed to fetch orders")
+      }
+    } catch (err) {
+      setError("Failed to fetch orders")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleCompleteDelivery = (orderId: string) => {
-    console.log("Completing delivery:", orderId)
-    // Handle delivery completion logic
+  const handleAcceptOrder = async (orderId: string) => {
+    if (!agentId) return
+    try {
+      const res = await fetch("/api/delivery/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, deliveryAgentId: agentId, action: "accept" })
+      })
+      if (res.ok) {
+        refreshOrders()
+      }
+    } catch {}
+  }
+
+  const handleCompleteDelivery = async (orderId: string) => {
+    if (!agentId) return
+    try {
+      const res = await fetch("/api/delivery/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, deliveryAgentId: agentId, action: "delivered" })
+      })
+      if (res.ok) {
+        refreshOrders()
+      }
+    } catch {}
+  }
+
+  const handleViewRoute = (pickup: string, delivery: string) => {
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(delivery)}`
+    window.open(url, "_blank")
+  }
+
+  const handleCallCustomer = (phone: string) => {
+    window.open(`tel:${phone}`)
   }
 
   return (
@@ -186,11 +249,11 @@ export default function DeliveryDashboard() {
                         <Button onClick={() => handleAcceptOrder(order.id)} className="flex-1">
                           Accept Order
                         </Button>
-                        <Button variant="outline">
+                        <Button variant="outline" onClick={() => handleViewRoute(order.pickup, order.delivery)}>
                           <Navigation className="h-4 w-4 mr-2" />
                           View Route
                         </Button>
-                        <Button variant="outline">
+                        <Button variant="outline" onClick={() => handleCallCustomer(order.customerPhone)}>
                           <Phone className="h-4 w-4 mr-2" />
                           Call Customer
                         </Button>
@@ -254,11 +317,11 @@ export default function DeliveryDashboard() {
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Complete Delivery
                         </Button>
-                        <Button variant="outline">
+                        <Button variant="outline" onClick={() => handleViewRoute(delivery.pickup, delivery.delivery)}>
                           <Navigation className="h-4 w-4 mr-2" />
                           Navigate
                         </Button>
-                        <Button variant="outline">
+                        <Button variant="outline" onClick={() => handleCallCustomer(delivery.customerPhone)}>
                           <Phone className="h-4 w-4 mr-2" />
                           Call Customer
                         </Button>
@@ -272,20 +335,52 @@ export default function DeliveryDashboard() {
 
           <TabsContent value="history" className="space-y-6">
             <h2 className="text-2xl font-bold">Delivery History</h2>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Deliveries</CardTitle>
-                <CardDescription>Your completed deliveries</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No delivery history available</p>
-                  <p className="text-sm">Complete your first delivery to see history</p>
-                </div>
-              </CardContent>
-            </Card>
+            {deliveryHistory.length === 0 ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Deliveries</CardTitle>
+                  <CardDescription>Your completed deliveries</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8 text-gray-500">
+                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No delivery history available</p>
+                    <p className="text-sm">Complete your first delivery to see history</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {deliveryHistory.map((order: any) => (
+                  <Card key={order.id} className="border-green-200 bg-green-50">
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">{order.orderNumber || order.id}</h3>
+                          <p className="text-gray-600">{order.customerName}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-green-600">₹{order.deliveryFee}</p>
+                          <p className="text-sm text-gray-500">Delivery fee</p>
+                        </div>
+                      </div>
+                      <div className="mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MapPin className="h-4 w-4 text-green-600" />
+                          <span className="font-medium">Delivered to</span>
+                        </div>
+                        <p className="text-sm text-gray-600 ml-6">{order.customerAddress}</p>
+                        <p className="text-sm text-gray-500 ml-6">Customer: {order.customerName}</p>
+                      </div>
+                      <div className="flex items-center justify-between mb-4 text-sm text-gray-600">
+                        <span>Items: {order.items?.map((i: any) => i.productName).join(", ")}</span>
+                        <span>Delivered At: {order.actualDeliveryTime ? new Date(order.actualDeliveryTime).toLocaleString() : "-"}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

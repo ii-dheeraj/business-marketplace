@@ -92,4 +92,34 @@ export async function GET(request: NextRequest) {
     console.error("[API] Error fetching delivery agent orders:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { orderId, deliveryAgentId, action } = body;
+    if (!orderId || !deliveryAgentId || !action) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    let updateData: any = { deliveryAgentId: Number(deliveryAgentId) };
+    if (action === "accept") {
+      updateData.orderStatus = "OUT_FOR_DELIVERY";
+    } else if (action === "picked_up") {
+      updateData.orderStatus = "IN_TRANSIT";
+    } else if (action === "delivered") {
+      updateData.orderStatus = "DELIVERED";
+      updateData.actualDeliveryTime = new Date();
+    }
+
+    const order = await prisma.order.update({
+      where: { id: Number(orderId) },
+      data: updateData,
+    });
+
+    return NextResponse.json({ success: true, order });
+  } catch (error) {
+    console.error("[API] Error updating delivery order:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 } 
