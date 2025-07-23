@@ -669,30 +669,32 @@ export default function SellerDashboard() {
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">Order #{order.orderNumber}</h3>
-                            <Badge className={getStatusColor(order.orderStatus)}>
-                              {getOrderStatusIcon(order.orderStatus)}
-                              <span className="ml-1">{order.orderStatus}</span>
+                            <h3 className="font-semibold">Order #{order.orderId}</h3>
+                            <Badge className={getStatusColor(order.status)}>
+                              {getOrderStatusIcon(order.status)}
+                              <span className="ml-1">{order.status}</span>
                           </Badge>
                         </div>
-                          <p className="text-sm text-gray-600">Customer: {order.customerName}</p>
-                          <p className="text-sm text-gray-600">Phone: {order.customerPhone}</p>
-                          <p className="text-sm text-gray-600">Items: {order.itemsCount} products</p>
-                          <p className="text-sm text-gray-600 hidden sm:block">
-                            Address: {order.customerAddress}, {order.customerArea}, {order.customerCity}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            Date: {new Date(order.createdAt).toLocaleDateString()}
-                          </p>
-                          <div className="text-xs text-gray-500">
-                            <p>Your Items: ₹{order.sellerSubtotal?.toLocaleString()}</p>
-                            <p>Commission: ₹{order.commission?.toLocaleString()}</p>
-                            <p className="font-medium">Net Amount: ₹{order.netAmount?.toLocaleString()}</p>
-                          </div>
+                        <p className="text-sm text-gray-600">Items: {Array.isArray(order.items) ? order.items.length : 0} products</p>
+                        {Array.isArray(order.items) && order.items.length > 0 && (
+                          <ul className="text-xs text-gray-500 list-disc ml-4">
+                            {order.items.map((item, idx) => (
+                              <li key={idx}>{item.productName} x {item.quantity}</li>
+                            ))}
+                          </ul>
+                        )}
+                        <p className="text-sm text-gray-600">
+                          Date: {order.created_at ? new Date(order.created_at).toLocaleDateString() : ''}
+                        </p>
+                        <div className="text-xs text-gray-500">
+                          <p>Subtotal: ₹{order.subtotal?.toLocaleString()}</p>
+                          <p>Commission: ₹{order.commission?.toLocaleString()}</p>
+                          <p className="font-medium">Net Amount: ₹{order.netAmount?.toLocaleString()}</p>
+                        </div>
                       </div>
                       <div className="text-right">
-                          <p className="text-lg font-bold">₹{order.totalAmount?.toLocaleString()}</p>
-                          <p className="text-sm text-gray-600 mb-2">Total Order</p>
+                          <p className="text-lg font-bold">Order ID: {order.id}</p>
+                          <p className="text-sm text-gray-600 mb-2">Seller Order</p>
                         <Button variant="outline" size="sm" className="mt-2 bg-transparent">
                           View Details
                         </Button>

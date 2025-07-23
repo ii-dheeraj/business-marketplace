@@ -21,13 +21,9 @@ export default function SellerOrderHistory() {
     }
     const user = JSON.parse(userInfoCookie)
     const fetchOrders = async () => {
-      const res = await fetch("/api/order/place")
+      const res = await fetch(`/api/seller/orders?sellerId=${user.id}`)
       const data = await res.json()
-      // Filter orders where any item has this seller's ID
-      const sellerOrders = (data.orders || []).filter((order: any) =>
-        order.items.some((item: any) => item.product && item.product.sellerId === user.id)
-      )
-      setOrders(sellerOrders)
+      setOrders(data.orders || [])
       setLoading(false)
     }
     fetchOrders()
@@ -56,26 +52,23 @@ export default function SellerOrderHistory() {
               <Card key={order.id}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    Order #{order.id}
-                    <Badge>{order.orderStatus}</Badge>
+                    Seller Order #{order.id}
+                    <Badge>{order.status}</Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                    <span>Total: <span className="font-semibold text-green-700">₹{order.totalAmount}</span></span>
-                    <span>Placed: {new Date(order.createdAt).toLocaleString()}</span>
-                    <span>Payment: {order.paymentMethod}</span>
+                    <span>Subtotal: <span className="font-semibold text-green-700">₹{order.subtotal}</span></span>
+                    <span>Placed: {new Date(order.created_at).toLocaleString()}</span>
                   </div>
                   <div className="mt-2">
                     <span className="font-medium">Items for your products:</span>
                     <ul className="list-disc ml-6 mt-1">
-                      {order.items
-                        .filter((item: any) => item.product && item.product.sellerId === JSON.parse(getCookie("userInfo")!).id)
-                        .map((item: any) => (
-                          <li key={item.id}>
-                            {item.name} x {item.quantity} (₹{item.price * item.quantity})
-                          </li>
-                        ))}
+                      {(order.items || []).map((item: any, idx: number) => (
+                        <li key={idx}>
+                          {item.productName} x {item.quantity} (₹{item.totalPrice})
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 </CardContent>

@@ -33,17 +33,15 @@ export default function CustomerOrderHistory() {
       return
     }
     const user = JSON.parse(userInfoCookie)
-    
     fetchOrders(user.id)
     setupRealTimeConnection(user.id)
-    
     return () => {
       // Cleanup real-time connection
       if (typeof window !== 'undefined' && window.eventSource) {
         window.eventSource.close()
       }
     }
-  }, [router])
+  }, [])
 
   const fetchOrders = async (customerId: string) => {
     try {

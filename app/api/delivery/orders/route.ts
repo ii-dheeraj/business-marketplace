@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/database";
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,26 +7,28 @@ export async function GET(request: NextRequest) {
     const deliveryAgentId = searchParams.get("deliveryAgentId");
 
     // Available orders: not assigned to any agent, status is confirmed/preparing/ready
-    const availableOrders = await prisma.order.findMany({
-      where: {
-        deliveryAgentId: null,
-        orderStatus: { in: ["CONFIRMED", "PREPARING", "READY_FOR_DELIVERY"] },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    });
+    const { data: availableOrders, error: availableError } = await supabase
+      .from("orders")
+      .select("*")
+      .is("deliveryAgentId", null)
+      .in("orderStatus", ["CONFIRMED", "PREPARING", "READY_FOR_DELIVERY"])
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (availableError) throw availableError;
+    const safeAvailableOrders = availableOrders || [];
 
     // Active deliveries: assigned to this agent, not delivered
-    let activeDeliveries: any[] = [];
+    let activeDeliveries = [];
     if (deliveryAgentId) {
-      activeDeliveries = await prisma.order.findMany({
-        where: {
-          deliveryAgentId: Number(deliveryAgentId),
-          orderStatus: { not: "DELIVERED" },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-      });
+      const { data: activeData, error: activeError } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("deliveryAgentId", Number(deliveryAgentId))
+        .not("orderStatus", "eq", "DELIVERED")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (activeError) throw activeError;
+      activeDeliveries = activeData || [];
     }
 
     // Stats for delivery agent
@@ -35,36 +37,34 @@ export async function GET(request: NextRequest) {
       todayDeliveries: 0,
       earnings: 0,
       rating: null,
-    }
+    };
     if (deliveryAgentId) {
       // Total deliveries completed
-      stats.totalDeliveries = await prisma.order.count({
-        where: {
-          deliveryAgentId: Number(deliveryAgentId),
-          orderStatus: "DELIVERED",
-        },
-      })
+      const { count: totalDeliveries = 0 } = await supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("deliveryAgentId", Number(deliveryAgentId))
+        .eq("orderStatus", "DELIVERED");
+      stats.totalDeliveries = totalDeliveries || 0;
       // Today's deliveries
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      stats.todayDeliveries = await prisma.order.count({
-        where: {
-          deliveryAgentId: Number(deliveryAgentId),
-          orderStatus: "DELIVERED",
-          updatedAt: { gte: today },
-        },
-      })
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { count: todayDeliveries = 0 } = await supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("deliveryAgentId", Number(deliveryAgentId))
+        .eq("orderStatus", "DELIVERED")
+        .gte("updated_at", today.toISOString());
+      stats.todayDeliveries = todayDeliveries || 0;
       // Total earnings (sum of deliveryFee for delivered orders)
-      const deliveredOrders = await prisma.order.findMany({
-        where: {
-          deliveryAgentId: Number(deliveryAgentId),
-          orderStatus: "DELIVERED",
-        },
-        select: { deliveryFee: true },
-      })
-      stats.earnings = deliveredOrders.reduce((sum, o) => sum + (o.deliveryFee || 0), 0)
+      const { data: deliveredOrders } = await supabase
+        .from("orders")
+        .select("deliveryFee")
+        .eq("deliveryAgentId", Number(deliveryAgentId))
+        .eq("orderStatus", "DELIVERED");
+      stats.earnings = (deliveredOrders || []).reduce((sum: number, o: any) => sum + (o.deliveryFee || 0), 0);
       // Rating: not implemented, set to null or fetch if available
-      stats.rating = null
+      stats.rating = null;
     }
 
     // Map orders to UI-friendly format
@@ -81,10 +81,12 @@ export async function GET(request: NextRequest) {
       items: order.items?.length ? order.items.map((i: any) => i.productName).join(", ") : "-",
       customerPhone: order.customerPhone,
       status: order.orderStatus,
+      created_at: order.created_at,
+      updated_at: order.updated_at,
     });
 
     return NextResponse.json({
-      availableOrders: availableOrders.map(mapOrder),
+      availableOrders: safeAvailableOrders.map(mapOrder),
       activeDeliveries: activeDeliveries.map(mapOrder),
       stats,
     });
@@ -112,10 +114,13 @@ export async function PATCH(request: NextRequest) {
       updateData.actualDeliveryTime = new Date();
     }
 
-    const order = await prisma.order.update({
-      where: { id: Number(orderId) },
-      data: updateData,
-    });
+    const { data: order, error } = await supabase
+      .from("orders")
+      .update(updateData)
+      .eq("id", Number(orderId))
+      .select()
+      .single();
+    if (error) throw error;
 
     return NextResponse.json({ success: true, order });
   } catch (error) {

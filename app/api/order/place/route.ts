@@ -232,6 +232,8 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1")
   const limit = parseInt(searchParams.get("limit") || "10")
   const skip = (page - 1) * limit
+  const deliveryAgentId = searchParams.get("deliveryAgentId")
+  const status = searchParams.get("status")
 
   try {
     if (orderId) {
@@ -255,9 +257,9 @@ export async function GET(request: NextRequest) {
       try {
         const result = await supabase
           .from('orders')
-          .select('id, orderNumber, orderStatus, customerName, customerPhone, totalAmount, paymentStatus, paymentMethod, createdAt, updatedAt, order_items(id, productName, quantity, unitPrice, totalPrice, productImage)')
+          .select('id, orderNumber, orderStatus, customerName, customerPhone, totalAmount, paymentStatus, paymentMethod, created_at, updated_at')
           .eq('customerId', Number(customerId))
-          .order('createdAt', { ascending: false })
+          .order('created_at', { ascending: false })
           .range(skip, skip + limit - 1)
         orders = result.data
         error = result.error
@@ -269,6 +271,7 @@ export async function GET(request: NextRequest) {
         console.error('[GET ERROR] Supabase error:', error)
         return NextResponse.json({ error: "Failed to fetch orders", details: error }, { status: 500 })
       }
+      console.log('[DEBUG] Orders fetched for customer:', orders)
       const { count } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
@@ -283,11 +286,40 @@ export async function GET(request: NextRequest) {
         }
       })
     }
+    if (deliveryAgentId || status) {
+      let query = supabase
+        .from('orders')
+        .select('id, orderNumber, orderStatus, customerName, customerPhone, totalAmount, paymentStatus, paymentMethod, deliveryAgentId, created_at, updated_at')
+      if (deliveryAgentId) {
+        query = query.eq('deliveryAgentId', Number(deliveryAgentId))
+      }
+      if (status) {
+        query = query.eq('orderStatus', status)
+      }
+      query = query.order('created_at', { ascending: false }).range(skip, skip + limit - 1)
+      const { data: orders, error } = await query
+      if (error) {
+        return NextResponse.json({ error: "Failed to fetch orders", details: error }, { status: 500 })
+      }
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('deliveryAgentId', Number(deliveryAgentId))
+      return NextResponse.json({
+        orders,
+        pagination: {
+          page,
+          limit,
+          total: count,
+          totalPages: Math.ceil((count || 0) / limit)
+        }
+      })
+    }
     // For admin/seller dashboard - optimized with pagination
     const { data: orders, error } = await supabase
       .from('orders')
-      .select('id, orderNumber, orderStatus, customerName, customerPhone, totalAmount, paymentStatus, paymentMethod, createdAt, updatedAt, order_items(id, productName, quantity, unitPrice, totalPrice)')
-      .order('createdAt', { ascending: false })
+      .select('id, orderNumber, orderStatus, customerName, customerPhone, totalAmount, paymentStatus, paymentMethod, created_at, updated_at, order_items(id, productName, quantity, unitPrice, totalPrice)')
+      .order('created_at', { ascending: false })
       .range(skip, skip + limit - 1)
     if (error) {
       return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 })
