@@ -840,7 +840,7 @@ export default function PaymentPage() {
               <CardContent className="space-y-4">
                 {/* Items */}
                 <div className="space-y-3 max-h-60 overflow-y-auto">
-                  {orderDetails.items.map((item) => (
+                  {(orderDetails.items || []).map((item) => (
                     <div key={item.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                       <Image
                         src={item.productImage || "/placeholder.svg"}
@@ -866,7 +866,7 @@ export default function PaymentPage() {
                 {/* Pricing */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Subtotal ({orderDetails.items.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
+                    <span>Subtotal ({(orderDetails.items || []).reduce((sum, item) => sum + item.quantity, 0)} items)</span>
                     <span>₹{orderDetails.subtotal}</span>
                   </div>
                   <div className="flex justify-between text-sm">

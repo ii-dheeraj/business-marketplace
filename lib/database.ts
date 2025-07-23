@@ -1,4 +1,8 @@
-import { prisma } from './prisma'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.SUPABASE_URL as string
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY as string
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Customer functions
 export const createCustomer = async (data: {
@@ -7,15 +11,33 @@ export const createCustomer = async (data: {
   password: string
   phone?: string
 }) => {
-  return await prisma.customer.create({ data })
+  const { data: customer, error } = await supabase
+    .from('customers')
+    .insert([{ ...data }])
+    .select()
+    .single()
+  if (error) throw error
+  return customer
 }
 
 export const findCustomerByEmail = async (email: string) => {
-  return await prisma.customer.findUnique({ where: { email } })
+  const { data: customer, error } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('email', email)
+    .single()
+  if (error) return null
+  return customer
 }
 
 export const findCustomerById = async (id: number) => {
-  return await prisma.customer.findUnique({ where: { id } })
+  const { data: customer, error } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) return null
+  return customer
 }
 
 // Seller functions
@@ -37,15 +59,33 @@ export const createSeller = async (data: {
   businessImage?: string
   deliveryTime?: string
 }) => {
-  return await prisma.seller.create({ data })
+  const { data: seller, error } = await supabase
+    .from('sellers')
+    .insert([{ ...data }])
+    .select()
+    .single()
+  if (error) throw error
+  return seller
 }
 
 export const findSellerByEmail = async (email: string) => {
-  return await prisma.seller.findUnique({ where: { email } })
+  const { data: seller, error } = await supabase
+    .from('sellers')
+    .select('*')
+    .eq('email', email)
+    .single()
+  if (error) return null
+  return seller
 }
 
 export const findSellerById = async (id: number) => {
-  return await prisma.seller.findUnique({ where: { id } })
+  const { data: seller, error } = await supabase
+    .from('sellers')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) return null
+  return seller
 }
 
 // Delivery Agent functions
@@ -57,21 +97,39 @@ export const createDeliveryAgent = async (data: {
   vehicleNumber: string
   vehicleType: string
 }) => {
-  return await prisma.deliveryAgent.create({ data })
+  const { data: agent, error } = await supabase
+    .from('delivery_agents')
+    .insert([{ ...data }])
+    .select()
+    .single()
+  if (error) throw error
+  return agent
 }
 
 export const findDeliveryAgentByEmail = async (email: string) => {
-  return await prisma.deliveryAgent.findUnique({ where: { email } })
+  const { data: agent, error } = await supabase
+    .from('delivery_agents')
+    .select('*')
+    .eq('email', email)
+    .single()
+  if (error) return null
+  return agent
 }
 
 export const findDeliveryAgentById = async (id: number) => {
-  return await prisma.deliveryAgent.findUnique({ where: { id } })
+  const { data: agent, error } = await supabase
+    .from('delivery_agents')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) return null
+  return agent
 }
 
 // User session storage functions
 export const storeUserSession = async (userType: string, userId: number) => {
   let userData: any = null
-  
+
   if (userType === 'CUSTOMER') {
     userData = await findCustomerById(userId)
   } else if (userType === 'SELLER') {
@@ -79,11 +137,11 @@ export const storeUserSession = async (userType: string, userId: number) => {
   } else if (userType === 'DELIVERY_AGENT') {
     userData = await findDeliveryAgentById(userId)
   }
-  
+
   if (!userData) {
     throw new Error('User not found')
   }
-  
+
   // Return user data with type information
   const baseUserData = {
     id: userData.id,
@@ -148,9 +206,10 @@ export const createOrder = async (data: {
   items: any[]
 }) => {
   // Step 1: Create order without orderNumber
-  const order = await prisma.order.create({
-    data: {
-      orderNumber: "temp", // Temporary, will update after creation
+  const { data: order, error } = await supabase
+    .from('orders')
+    .insert([{
+      orderNumber: 'temp',
       customerId: data.customerId,
       customerName: data.customerName,
       customerPhone: data.customerPhone,
@@ -162,35 +221,34 @@ export const createOrder = async (data: {
       deliveryFee: data.deliveryFee,
       taxAmount: data.taxAmount,
       totalAmount: data.totalAmount,
-      paymentMethod: data.paymentMethod as any,
+      paymentMethod: data.paymentMethod,
       deliveryInstructions: data.deliveryInstructions,
-      orderStatus: "CONFIRMED",
-      items: {
-        create: data.items.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalPrice: item.totalPrice,
-          productName: item.productName,
-          productImage: item.productImage,
-          productCategory: item.productCategory
-        }))
-      }
-    },
-    include: {
-      items: true,
-      customer: true
-    }
-  })
+      orderStatus: 'CONFIRMED',
+    }])
+    .select()
+    .single()
+  if (error) throw error
   // Step 2: Update orderNumber to be the running id
-  const updatedOrder = await prisma.order.update({
-    where: { id: order.id },
-    data: { orderNumber: order.id.toString() },
-    include: {
-      items: true,
-      customer: true
-    }
-  })
+  const { data: updatedOrder, error: updateError } = await supabase
+    .from('orders')
+    .update({ orderNumber: order.id.toString() })
+    .eq('id', order.id)
+    .select()
+    .single()
+  if (updateError) throw updateError
+  // Insert order items
+  for (const item of data.items) {
+    await supabase.from('order_items').insert({
+      orderId: order.id,
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+      productName: item.productName,
+      productImage: item.productImage,
+      productCategory: item.productCategory
+    })
+  }
   return updatedOrder
 }
 
@@ -202,37 +260,44 @@ export const createSellerOrder = async (data: {
   commission: number
   netAmount: number
 }) => {
-  return await prisma.sellerOrder.create({
-    data: {
+  const { data: sellerOrder, error } = await supabase
+    .from('seller_orders')
+    .insert([{
       orderId: data.orderId,
       sellerId: data.sellerId,
       items: data.items,
       subtotal: data.subtotal,
       commission: data.commission,
       netAmount: data.netAmount
-    }
-  })
+    }])
+    .select()
+    .single()
+  if (error) throw error
+  return sellerOrder
 }
 
 export const createPayment = async (data: {
   orderId: number
-  customerId: number
+  userId: number
   amount: number
   paymentMethod: string
   transactionId?: string
   gateway?: string
 }) => {
   const paymentId = `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-  
-  return await prisma.payment.create({
-    data: {
+  const { data: payment, error } = await supabase
+    .from('payments')
+    .insert([{
       paymentId,
       orderId: data.orderId,
-      customerId: data.customerId,
+      userId: data.userId,
       amount: data.amount,
-      paymentMethod: data.paymentMethod as any,
+      paymentMethod: data.paymentMethod,
       transactionId: data.transactionId,
       gateway: data.gateway
-    }
-  })
+    }])
+    .select()
+    .single()
+  if (error) throw error
+  return payment
 } 

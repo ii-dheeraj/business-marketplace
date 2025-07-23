@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { createCustomer, createSeller, createDeliveryAgent, storeUserSession } from "@/lib/database";
+import { createCustomer, createSeller, createDeliveryAgent, storeUserSession, findCustomerByEmail, findSellerByEmail, findDeliveryAgentByEmail } from "@/lib/database";
 import bcrypt from "bcryptjs";
 
 export async function POST(request: NextRequest) {
@@ -39,7 +38,7 @@ export async function POST(request: NextRequest) {
     // Create user based on type
     if (userType === 'CUSTOMER') {
       // Check if customer already exists
-      const existingCustomer = await prisma.customer.findUnique({ where: { email } });
+      const existingCustomer = await findCustomerByEmail(email);
       if (existingCustomer) {
         return NextResponse.json({ error: "Customer already exists" }, { status: 409 });
       }
@@ -53,7 +52,7 @@ export async function POST(request: NextRequest) {
       userTypeForResponse = 'CUSTOMER';
     } else if (userType === 'SELLER') {
       // Check if seller already exists
-      const existingSeller = await prisma.seller.findUnique({ where: { email } });
+      const existingSeller = await findSellerByEmail(email);
       if (existingSeller) {
         return NextResponse.json({ error: "Seller already exists" }, { status: 409 });
       }
@@ -83,7 +82,7 @@ export async function POST(request: NextRequest) {
       userTypeForResponse = 'SELLER';
     } else if (userType === 'DELIVERY_AGENT') {
       // Check if delivery agent already exists
-      const existingDeliveryAgent = await prisma.deliveryAgent.findUnique({ where: { email } });
+      const existingDeliveryAgent = await findDeliveryAgentByEmail(email);
       if (existingDeliveryAgent) {
         return NextResponse.json({ error: "Delivery agent already exists" }, { status: 409 });
       }

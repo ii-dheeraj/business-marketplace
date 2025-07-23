@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { findCustomerByEmail, findSellerByEmail, findDeliveryAgentByEmail, storeUserSession } from "@/lib/database";
 import bcrypt from "bcryptjs";
 

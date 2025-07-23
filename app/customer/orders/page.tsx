@@ -49,6 +49,7 @@ export default function CustomerOrderHistory() {
     try {
       const res = await fetch(`/api/order/place?customerId=${customerId}`)
       const data = await res.json()
+      console.log('[DEBUG] Orders fetched from API:', data)
       setOrders(data.orders || [])
     } catch (error) {
       console.error("Error fetching orders:", error)
@@ -255,7 +256,7 @@ export default function CustomerOrderHistory() {
                   <div className="mt-2">
                     <span className="font-medium">Items:</span>
                     <ul className="list-disc ml-6 mt-1">
-                      {order.items.map((item: any) => (
+                      {(order.order_items || []).map((item: any) => (
                         <li key={item.id}>
                           {item.productName} x {item.quantity} (₹{item.totalPrice})
                         </li>
@@ -276,7 +277,7 @@ export default function CustomerOrderHistory() {
                       estimatedDeliveryTime={order.estimatedDeliveryTime}
                       actualDeliveryTime={order.actualDeliveryTime}
                       deliveryInstructions={order.deliveryInstructions}
-                      items={order.items}
+                      items={order.order_items || []}
                       sellerOrders={order.sellerOrders || []}
                       deliveryAgent={order.deliveryAgent}
                     />

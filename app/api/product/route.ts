@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { supabase } from "@/lib/database"
 import { realtimeManager } from "@/lib/realtime"
 
 // Add a new product
@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
     if (!name || !price || !sellerId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
-    
-    const product = await prisma.product.create({
-      data: {
+    const { data: product, error: createError } = await supabase
+      .from('products')
+      .insert([{
         name,
         description,
         price: Number(price),
@@ -35,9 +35,12 @@ export async function POST(request: NextRequest) {
         stock: stock ? Number(stock) : 0,
         inStock: (stock ? Number(stock) : 0) > 0,
         isActive: true
-      },
-    })
-    
+      }])
+      .select()
+      .single()
+    if (createError) {
+      return NextResponse.json({ error: createError.message }, { status: 500 })
+    }
     // Send real-time notification to seller
     try {
       await realtimeManager.sendNotification(String(sellerId), {
@@ -51,7 +54,6 @@ export async function POST(request: NextRequest) {
     } catch (notifyErr) {
       console.error("[API] Failed to send real-time notification to seller:", sellerId, notifyErr)
     }
-    
     return NextResponse.json({ success: true, product })
   } catch (error) {
     console.error("Error adding product:", error)
@@ -65,66 +67,29 @@ export async function GET(request: NextRequest) {
   const sellerId = searchParams.get("sellerId")
   const page = parseInt(searchParams.get("page") || "1")
   const limit = parseInt(searchParams.get("limit") || "20")
-  const skip = (page - 1) * limit
-  
+  const from = (page - 1) * limit
+  const to = from + limit - 1
   try {
-    if (sellerId && isNaN(Number(sellerId))) {
-      console.error("Invalid sellerId provided to /api/product:", sellerId)
-      return NextResponse.json({ error: "Invalid sellerId" }, { status: 400 })
+    let query = supabase
+      .from('products')
+      .select('id, name, description, price, originalPrice, image, category, subcategory, stock, inStock, isActive, sellerId, created_at, updated_at', { count: 'exact' })
+      .eq('isActive', true)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+    if (sellerId) {
+      query = query.eq('sellerId', Number(sellerId))
     }
-    console.log("[API] Fetching products for sellerId:", sellerId)
-    // Optimized query with pagination and minimal includes
-    const [products, totalCount] = await Promise.all([
-      prisma.product.findMany({
-        where: {
-          ...(sellerId ? { sellerId: Number(sellerId) } : {}),
-          isActive: true
-        },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          price: true,
-          originalPrice: true,
-          image: true,
-          category: true,
-          subcategory: true,
-          stock: true,
-          inStock: true,
-          isActive: true,
-          sellerId: true,
-          createdAt: true,
-          updatedAt: true,
-          seller: {
-            select: {
-              id: true,
-              name: true,
-              businessName: true,
-              businessCity: true // fixed from businessCategory
-            }
-          }
-        },
-        skip,
-        take: limit,
-        orderBy: {
-          createdAt: 'desc'
-        }
-      }),
-      prisma.product.count({
-        where: {
-          ...(sellerId ? { sellerId: Number(sellerId) } : {}),
-          isActive: true
-        }
-      })
-    ])
-    
+    const { data: products, error, count } = await query
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
     return NextResponse.json({ 
       products,
       pagination: {
         page,
         limit,
-        total: totalCount,
-        totalPages: Math.ceil(totalCount / limit)
+        total: count,
+        totalPages: Math.ceil((count || 0) / limit)
       }
     })
   } catch (error) {
@@ -148,21 +113,18 @@ export async function PATCH(request: NextRequest) {
       inStock,
       isActive
     } = await request.json()
-    
     if (!id) {
       return NextResponse.json({ error: "Missing product id" }, { status: 400 })
     }
-
     // Get current product to compare stock
-    const currentProduct = await prisma.product.findUnique({
-      where: { id: Number(id) },
-      select: { stock: true, sellerId: true, name: true }
-    })
-
-    if (!currentProduct) {
+    const { data: currentProduct, error: findError } = await supabase
+      .from('products')
+      .select('stock, sellerId, name')
+      .eq('id', Number(id))
+      .single()
+    if (findError || !currentProduct) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 })
     }
-    
     const updateData: any = {
       ...(name && { name }),
       ...(description && { description }),
@@ -172,20 +134,22 @@ export async function PATCH(request: NextRequest) {
       ...(category && { category }),
       ...(subcategory && { subcategory }),
       ...(typeof stock !== "undefined" && { stock: Number(stock) }),
-      ...(typeof inStock !== "undefined" && { inStock }),
-      ...(typeof isActive !== "undefined" && { isActive })
+      ...(typeof inStock !== "undefined" && { inStock: inStock }),
+      ...(typeof isActive !== "undefined" && { isActive: isActive })
     }
-    
     // Update inStock based on stock if stock is provided
     if (typeof stock !== "undefined") {
       updateData.inStock = Number(stock) > 0
     }
-    
-    const updated = await prisma.product.update({
-      where: { id: Number(id) },
-      data: updateData
-    })
-
+    const { data: updated, error: updateError } = await supabase
+      .from('products')
+      .update(updateData)
+      .eq('id', Number(id))
+      .select()
+      .single()
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 })
+    }
     // Send real-time inventory alert if stock changed
     if (typeof stock !== "undefined" && stock !== currentProduct.stock) {
       try {
@@ -196,7 +160,6 @@ export async function PATCH(request: NextRequest) {
           oldStock: currentProduct.stock,
           timestamp: new Date()
         })
-
         // Send low stock alert if stock is below 10
         if (Number(stock) <= 10 && Number(stock) > 0) {
           await realtimeManager.sendNotification(currentProduct.sellerId.toString(), {
@@ -213,7 +176,6 @@ export async function PATCH(request: NextRequest) {
             userId: currentProduct.sellerId.toString()
           })
         }
-
         // Send out of stock alert if stock is 0
         if (Number(stock) === 0) {
           await realtimeManager.sendNotification(currentProduct.sellerId.toString(), {
@@ -234,7 +196,6 @@ export async function PATCH(request: NextRequest) {
         // Don't fail the update if notifications fail
       }
     }
-    
     return NextResponse.json({ success: true, product: updated })
   } catch (error) {
     console.error("Error updating product:", error)
@@ -245,17 +206,17 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { id } = await request.json()
-    
     if (!id) {
       return NextResponse.json({ error: "Missing product id" }, { status: 400 })
     }
-    
     // Soft delete by setting isActive to false
-    await prisma.product.update({
-      where: { id: Number(id) },
-      data: { isActive: false }
-    })
-    
+    const { error: deleteError } = await supabase
+      .from('products')
+      .update({ isActive: false })
+      .eq('id', Number(id))
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 })
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error deleting product:", error)
