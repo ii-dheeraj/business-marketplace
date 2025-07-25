@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { supabase, createOrder, createSellerOrder, createPayment } from "@/lib/database"
 import { realtimeManager } from "@/lib/realtime"
+import { generateParcelOTP, setOrderParcelOTP } from "@/lib/database";
 
 export async function POST(request: NextRequest) {
   try {
@@ -401,6 +402,11 @@ export async function PATCH(request: NextRequest) {
         description: getStatusDescription(orderStatus),
         location: getStatusLocation(orderStatus)
       })
+      // If status is READY_FOR_PICKUP, generate and store OTP
+      if (orderStatus === 'READY_FOR_PICKUP') {
+        const otp = generateParcelOTP();
+        await setOrderParcelOTP(order.id, otp);
+      }
     }
     // Send real-time notifications for order status changes
     if (orderStatus) {

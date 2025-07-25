@@ -101,6 +101,8 @@ CREATE TABLE "orders" (
     "deliveryInstructions" TEXT,
     "estimatedDeliveryTime" TIMESTAMP,
     "actualDeliveryTime" TIMESTAMP,
+    "parcel_otp" TEXT,
+    "delivery_agent_location" JSONB,
     "created_at" TIMESTAMP DEFAULT NOW(),
     "updated_at" TIMESTAMP DEFAULT NOW()
 );

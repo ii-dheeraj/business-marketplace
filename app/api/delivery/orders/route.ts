@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/database";
+import {
+  setOrderParcelOTP,
+  validateOrderParcelOTP,
+  updateOrderDeliveryAgentLocation
+} from "@/lib/database";
 
 export async function GET(request: NextRequest) {
   try {
@@ -125,6 +130,44 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true, order });
   } catch (error) {
     console.error("[API] Error updating delivery order:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { action, orderId, otp, location, deliveryAgentId } = body;
+    if (!action || !orderId) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    if (action === "validate_otp") {
+      if (!otp) return NextResponse.json({ error: "Missing OTP" }, { status: 400 });
+      const valid = await validateOrderParcelOTP(Number(orderId), otp);
+      if (!valid) return NextResponse.json({ success: false, error: "Invalid OTP" }, { status: 401 });
+      // Mark as PICKED_UP and add tracking entry
+      await supabase.from("orders").update({ orderStatus: "IN_TRANSIT" }).eq("id", Number(orderId));
+      await supabase.from("order_tracking").insert({
+        orderId: Number(orderId),
+        status: "PICKED_UP",
+        description: "Parcel picked up by delivery agent.",
+        location: "Seller Location"
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "update_location") {
+      if (!location || !deliveryAgentId) return NextResponse.json({ error: "Missing location or deliveryAgentId" }, { status: 400 });
+      await updateOrderDeliveryAgentLocation(Number(orderId), location);
+      // Optionally, also update delivery agent's currentLocation
+      await supabase.from("delivery_agents").update({ currentLocation: JSON.stringify(location) }).eq("id", Number(deliveryAgentId));
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+  } catch (error) {
+    console.error("[API] Error in delivery POST:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 } 

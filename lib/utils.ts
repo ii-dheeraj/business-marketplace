@@ -92,3 +92,20 @@ export function generateOrderNumber(): string {
 export function generatePaymentId(): string {
   return `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
+
+/**
+ * Send OTP to user via SMS/WhatsApp or log to console in development.
+ * Swap out the implementation for real provider in production.
+ * @param phone - The recipient's phone number
+ * @param otp - The OTP code
+ * @param message - The message template (should include the OTP)
+ */
+export async function sendOTP(phone: string, otp: string, message: string) {
+  if (process.env.NODE_ENV === 'production') {
+    // TODO: Integrate with SMS/WhatsApp provider here
+    throw new Error('SMS/WhatsApp provider integration not implemented.');
+  } else {
+    // Development: Log OTP to console in yellow
+    console.log('\x1b[33m%s\x1b[0m', `[DEV OTP] Send to ${phone}: ${message.replace('{OTP}', otp)}`);
+  }
+}

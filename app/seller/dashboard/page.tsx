@@ -34,6 +34,7 @@ import {
   BarChart3,
   Store,
   Save,
+  Navigation,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -41,8 +42,32 @@ import Image from "next/image"
 import { getCookie, deleteCookie } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast";
 import { indianStates, indianStateCityMap } from "@/utils/indian-location-data";
+import Script from "next/script";
+
+// Add this line to get the Google Maps API key from environment variables
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 // Remove mockProducts array and any references to it
+
+// Helper to load Google Maps JS API
+function loadGoogleMapsScript(apiKey: string, callback: () => void) {
+  if (typeof window === "undefined") return;
+  if ((window as any).google && (window as any).google.maps) {
+    callback();
+    return;
+  }
+  const existingScript = document.getElementById("google-maps-js");
+  if (existingScript) {
+    existingScript.addEventListener("load", callback);
+    return;
+  }
+  const script = document.createElement("script");
+  script.id = "google-maps-js";
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+  script.async = true;
+  script.onload = callback;
+  document.body.appendChild(script);
+}
 
 export default function SellerDashboard() {
   const [sellerInfo, setSellerInfo] = useState<any>(null)
@@ -61,6 +86,8 @@ export default function SellerDashboard() {
   const { toast } = useToast();
   const [profileForm, setProfileForm] = useState<any>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [trackingOrders, setTrackingOrders] = useState<any[]>([]);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
 
   useEffect(() => {
     if (sellerInfo) {
@@ -132,6 +159,20 @@ export default function SellerDashboard() {
     }
   }
 
+  // Fetch tracking orders (OUT_FOR_DELIVERY or IN_TRANSIT)
+  const fetchTrackingOrders = async () => {
+    if (!sellerInfo) return;
+    try {
+      const res = await fetch(`/api/seller/orders?sellerId=${sellerInfo.id}&status=OUT_FOR_DELIVERY`);
+      const data = await res.json();
+      const inTransitRes = await fetch(`/api/seller/orders?sellerId=${sellerInfo.id}&status=IN_TRANSIT`);
+      const inTransitData = await inTransitRes.json();
+      setTrackingOrders([...(data.orders || []), ...(inTransitData.orders || [])]);
+    } catch (err) {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     const userInfoCookie = getCookie("userInfo")
     if (userInfoCookie) {
@@ -154,6 +195,7 @@ export default function SellerDashboard() {
     if (sellerInfo && sellerInfo.id) {
       fetchProducts(1)
       fetchOrders(1)
+      fetchTrackingOrders(); // Initial fetch for tracking orders
       // Set up SSE for real-time product and order updates
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
@@ -168,6 +210,7 @@ export default function SellerDashboard() {
               fetchProducts(currentPage);
             } else if (data.title.toLowerCase().includes('order')) {
               fetchOrders(currentPage);
+              fetchTrackingOrders(); // Refresh tracking orders on order updates
             }
           }
         } catch (e) {
@@ -197,7 +240,7 @@ export default function SellerDashboard() {
 
   const handleEditProduct = (product: any) => {
     console.log("Editing product:", product) // Debug log
-    const formData = { 
+    const formData = {
       name: product.name || "",
       description: product.description || "",
       price: product.price || "",
@@ -214,7 +257,7 @@ export default function SellerDashboard() {
   }
   const handleSaveEdit = async () => {
     if (!editingProduct) return
-    
+
     const updateData = {
       id: editingProduct.id,
       name: editForm.name,
@@ -224,9 +267,9 @@ export default function SellerDashboard() {
       image: editForm.image,
       category: editForm.category,
     }
-    
+
     console.log("Saving product with data:", updateData) // Debug log
-    
+
     const res = await fetch("/api/product", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -470,48 +513,48 @@ export default function SellerDashboard() {
                         </TableRow>
                       ) : (
                         products.map((product) => (
-                        <TableRow key={product.id}>
-                          <TableCell>
-                            <Image
-                              src={product.image || "/placeholder.svg"}
-                              alt={product.name}
-                              width={50}
-                              height={50}
-                              className="rounded-md object-cover"
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">{product.name}</TableCell>
-                          <TableCell className="hidden sm:table-cell">{product.category}</TableCell>
-                          <TableCell>₹{product.price}</TableCell>
+                          <TableRow key={product.id}>
+                            <TableCell>
+                              <Image
+                                src={product.image || "/placeholder.svg"}
+                                alt={product.name}
+                                width={50}
+                                height={50}
+                                className="rounded-md object-cover"
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{product.name}</TableCell>
+                            <TableCell className="hidden sm:table-cell">{product.category}</TableCell>
+                            <TableCell>₹{product.price}</TableCell>
                             <TableCell className="hidden md:table-cell">{product.stock || 0}</TableCell>
-                          <TableCell>
+                            <TableCell>
                               <Badge className={getStatusColor(product.stock > 0 ? "active" : "out_of_stock")}>
                                 {product.stock > 0 ? "active" : "out of stock"}
                               </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => {
                                     console.log("Edit clicked for product:", product);
                                     handleEditProduct(product);
                                   }}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteProduct(product.id)}>
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteProduct(product.id)}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
                         ))
                       )}
                     </TableBody>
@@ -664,47 +707,138 @@ export default function SellerDashboard() {
                 </Card>
               ) : (
                 orders.map((order) => (
-                <Card key={order.id}>
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                  <Card key={order.id}>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
                             <h3 className="font-semibold">Order #{order.orderId}</h3>
                             <Badge className={getStatusColor(order.status)}>
                               {getOrderStatusIcon(order.status)}
                               <span className="ml-1">{order.status}</span>
-                          </Badge>
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">Items: {Array.isArray(order.items) ? order.items.length : 0} products</p>
+                          {Array.isArray(order.items) && order.items.length > 0 && (
+                            <ul className="text-xs text-gray-500 list-disc ml-4">
+                              {order.items.map((item: any, idx: number) => (
+                                <li key={idx}>{item.productName} x {item.quantity}</li>
+                              ))}
+                            </ul>
+                          )}
+                          <p className="text-sm text-gray-600">
+                            Date: {order.created_at ? new Date(order.created_at).toLocaleDateString() : ''}
+                          </p>
+                          <div className="text-xs text-gray-500">
+                            <p>Subtotal: ₹{order.subtotal?.toLocaleString()}</p>
+                            <p>Commission: ₹{order.commission?.toLocaleString()}</p>
+                            <p className="font-medium">Net Amount: ₹{order.netAmount?.toLocaleString()}</p>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-600">Items: {Array.isArray(order.items) ? order.items.length : 0} products</p>
-                        {Array.isArray(order.items) && order.items.length > 0 && (
-                          <ul className="text-xs text-gray-500 list-disc ml-4">
-                            {order.items.map((item, idx) => (
-                              <li key={idx}>{item.productName} x {item.quantity}</li>
-                            ))}
-                          </ul>
-                        )}
-                        <p className="text-sm text-gray-600">
-                          Date: {order.created_at ? new Date(order.created_at).toLocaleDateString() : ''}
-                        </p>
-                        <div className="text-xs text-gray-500">
-                          <p>Subtotal: ₹{order.subtotal?.toLocaleString()}</p>
-                          <p>Commission: ₹{order.commission?.toLocaleString()}</p>
-                          <p className="font-medium">Net Amount: ₹{order.netAmount?.toLocaleString()}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
+                        <div className="text-right">
                           <p className="text-lg font-bold">Order ID: {order.id}</p>
                           <p className="text-sm text-gray-600 mb-2">Seller Order</p>
-                        <Button variant="outline" size="sm" className="mt-2 bg-transparent">
-                          View Details
-                        </Button>
+                          <Button variant="outline" size="sm" className="mt-2 bg-transparent">
+                            View Details
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
                 ))
               )}
             </div>
+            {trackingOrders.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-lg font-bold mb-2">Live Delivery Tracking</h3>
+                {trackingOrders.map((order) => {
+                  const mapId = `live-map-${order.id}`;
+                  useEffect(() => {
+                    if (!GOOGLE_MAPS_API_KEY || !order.customerAddress) return;
+                    loadGoogleMapsScript(GOOGLE_MAPS_API_KEY, () => {
+                      if (!(window as any).google || !(window as any).google.maps) return;
+                      if (!navigator.geolocation) return;
+                      navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                          const origin = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                          };
+                          const map = new (window as any).google.maps.Map(document.getElementById(mapId), {
+                            zoom: 14,
+                            center: origin,
+                          });
+                          const directionsService = new (window as any).google.maps.DirectionsService();
+                          const directionsRenderer = new (window as any).google.maps.DirectionsRenderer();
+                          directionsRenderer.setMap(map);
+                          directionsService.route(
+                            {
+                              origin,
+                              destination: order.customerAddress,
+                              travelMode: "DRIVING",
+                            },
+                            (result: any, status: string) => {
+                              if (status === "OK") {
+                                directionsRenderer.setDirections(result);
+                              }
+                            }
+                          );
+                        },
+                        (error) => {
+                          // fallback: just show destination
+                          const map = new (window as any).google.maps.Map(document.getElementById(mapId), {
+                            zoom: 14,
+                            center: { lat: 20.5937, lng: 78.9629 }, // India center
+                          });
+                          new (window as any).google.maps.Marker({
+                            position: { lat: 20.5937, lng: 78.9629 },
+                            map,
+                            title: "Could not get your location",
+                          });
+                        }
+                      );
+                    });
+                  }, [order.customerAddress]);
+                  return (
+                    <Card key={order.id} className="mb-4">
+                      <CardContent className="p-4">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <MapPin className="h-4 w-4 text-green-600" />
+                              <span className="font-medium">Order #{order.orderNumber || order.id}</span>
+                            </div>
+                            <p className="text-sm text-gray-600 ml-6">Delivering to: {order.customerAddress}</p>
+                            <p className="text-sm text-gray-500 ml-6">Customer: {order.customerName}</p>
+                          </div>
+                          <div className="flex flex-col gap-2 items-end">
+                            <span className="text-xs text-gray-500">Status: {order.orderStatus}</span>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                const origin = "Current+Location";
+                                const dest = encodeURIComponent(order.customerAddress);
+                                window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}`);
+                              }}
+                            >
+                              <Navigation className="h-4 w-4 mr-2" />
+                              View Route
+                            </Button>
+                            <p className="text-xs text-gray-500 mt-1">
+                              If Google Maps shows the same source and destination, please enable location access in your browser or try on a mobile device.
+                            </p>
+                          </div>
+                        </div>
+                        {/* Custom Google Map */}
+                        <div className="mt-4" style={{ height: 300 }}>
+                          <div id={mapId} style={{ width: "100%", height: 300 }} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </TabsContent>
 
           {/* Analytics Tab */}
@@ -733,7 +867,7 @@ export default function SellerDashboard() {
                       <span>Average Order Value</span>
                       <span className="font-bold">
                         ₹
-                        {orders.length > 0 
+                        {orders.length > 0
                           ? Math.round(orders.reduce((sum, order) => sum + (order.sellerSubtotal || 0), 0) / orders.length).toLocaleString()
                           : '0'
                         }
@@ -826,7 +960,7 @@ export default function SellerDashboard() {
                     </div>
                     <div>
                       <Label htmlFor="profile-businessPincode">Pincode <span className="text-red-500">*</span></Label>
-                      <Input id="profile-businessPincode" value={profileForm.businessPincode || ""} onChange={e => handleProfileInputChange("businessPincode", e.target.value.replace(/[^0-9]/g, '').slice(0,6))} maxLength={6} required pattern="^[0-9]{6}$" placeholder="6-digit pincode" />
+                      <Input id="profile-businessPincode" value={profileForm.businessPincode || ""} onChange={e => handleProfileInputChange("businessPincode", e.target.value.replace(/[^0-9]/g, '').slice(0, 6))} maxLength={6} required pattern="^[0-9]{6}$" placeholder="6-digit pincode" />
                     </div>
                     <div>
                       <Label htmlFor="profile-businessAddress">Business Address</Label>
@@ -966,6 +1100,12 @@ export default function SellerDashboard() {
           </div>
         </div>
       )}
+      {/* Google Maps Script */}
+      <Script
+        src={`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`}
+        strategy="afterInteractive"
+        onLoad={() => setMapsLoaded(true)}
+      />
     </div>
   )
 }

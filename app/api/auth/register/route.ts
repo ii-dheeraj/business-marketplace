@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCustomer, createSeller, createDeliveryAgent, storeUserSession, findCustomerByEmail, findSellerByEmail, findDeliveryAgentByEmail } from "@/lib/database";
-import bcrypt from "bcryptjs";
+import { createCustomer, createSeller, createDeliveryAgent, storeUserSession, findCustomerByEmail, findSellerByEmail, findDeliveryAgentByEmail, findCustomerByPhone, findSellerByPhone, findDeliveryAgentByPhone } from "@/lib/database";
+import { sendOTP } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-      name, 
-      email, 
-      password, 
-      phone, 
-      userType, 
+    const {
+      name,
+      email,
+      phone,
+      userType,
       businessName,
       category,
       subcategories,
@@ -23,123 +22,123 @@ export async function POST(request: NextRequest) {
       businessDescription,
       businessImage,
       vehicleNumber,
-      vehicleType
+      vehicleType,
+      otp,
+      step
     } = body;
 
-    if (!name || !email || !password || !userType) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    // Step 1: Request OTP
+    if (step === "request_otp") {
+      if (!phone) {
+        return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
+      }
+      // Check for duplicate phone/email
+      const existingPhone = await findCustomerByPhone(phone) || await findSellerByPhone(phone) || await findDeliveryAgentByPhone(phone);
+      const existingEmail = email ? (await findCustomerByEmail(email) || await findSellerByEmail(email) || await findDeliveryAgentByEmail(email)) : null;
+      if (existingPhone) {
+        return NextResponse.json({ error: "Phone number already registered" }, { status: 409 });
+      }
+      if (existingEmail) {
+        return NextResponse.json({ error: "Email already registered" }, { status: 409 });
+      }
+      // Send OTP
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      // Store OTP in-memory (for demo, production should use DB or cache)
+      globalThis.__signupOtps = globalThis.__signupOtps || {};
+      globalThis.__signupOtps[phone] = { otp: otpCode, expiresAt: Date.now() + 5 * 60 * 1000, data: body };
+      await sendOTP(phone, otpCode, `Your signup OTP is {OTP}`);
+      return NextResponse.json({ success: true, message: "OTP sent to your phone (check console in dev)", phone });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    let user: any;
-    let userTypeForResponse: string;
-
-    // Create user based on type
-    if (userType === 'CUSTOMER') {
-      // Check if customer already exists
-      const existingCustomer = await findCustomerByEmail(email);
-      if (existingCustomer) {
-        return NextResponse.json({ error: "Customer already exists" }, { status: 409 });
+    // Step 2: Verify OTP and create user
+    if (step === "verify_otp") {
+      if (!phone || !otp) {
+        return NextResponse.json({ error: "Phone and OTP are required" }, { status: 400 });
       }
-
-      user = await createCustomer({
-        name,
-        email,
-        password: hashedPassword,
-        phone
+      const store = globalThis.__signupOtps && globalThis.__signupOtps[phone];
+      if (!store || Date.now() > store.expiresAt) {
+        return NextResponse.json({ error: "OTP expired or not found" }, { status: 400 });
+      }
+      if (store.otp !== otp) {
+        return NextResponse.json({ error: "Invalid OTP" }, { status: 401 });
+      }
+      // Use stored data for user creation
+      const regData = store.data;
+      let user;
+      let userTypeForResponse;
+      if (regData.userType === 'CUSTOMER') {
+        user = await createCustomer({
+          name: regData.name,
+          email: regData.email,
+          password: '', // No password
+          phone: regData.phone
+        });
+        userTypeForResponse = 'CUSTOMER';
+      } else if (regData.userType === 'SELLER') {
+        user = await createSeller({
+          name: regData.name,
+          email: regData.email,
+          password: '',
+          phone: regData.phone,
+          businessName: regData.businessName,
+          category: regData.category,
+          subcategories: regData.subcategories ? JSON.stringify(regData.subcategories) : '[]',
+          businessAddress: regData.businessAddress,
+          businessCity: regData.businessCity,
+          businessState: regData.businessState,
+          businessPincode: regData.businessPincode,
+          businessArea: regData.businessArea,
+          businessLocality: regData.businessLocality,
+          businessDescription: regData.businessDescription,
+          businessImage: regData.businessImage,
+          deliveryTime: '30-45 min'
+        });
+        userTypeForResponse = 'SELLER';
+      } else if (regData.userType === 'DELIVERY_AGENT') {
+        user = await createDeliveryAgent({
+          name: regData.name,
+          email: regData.email,
+          password: '',
+          phone: regData.phone,
+          vehicleNumber: regData.vehicleNumber,
+          vehicleType: regData.vehicleType
+        });
+        userTypeForResponse = 'DELIVERY_AGENT';
+      } else {
+        return NextResponse.json({ error: "Invalid user type" }, { status: 400 });
+      }
+      // Clean up OTP
+      delete globalThis.__signupOtps[phone];
+      // Store user session
+      const userSession = await storeUserSession(userTypeForResponse, user.id);
+      const response = NextResponse.json({
+        success: true,
+        message: `Successfully registered as ${userTypeForResponse}`,
+        user: userSession
       });
-      userTypeForResponse = 'CUSTOMER';
-    } else if (userType === 'SELLER') {
-      // Check if seller already exists
-      const existingSeller = await findSellerByEmail(email);
-      if (existingSeller) {
-        return NextResponse.json({ error: "Seller already exists" }, { status: 409 });
-      }
-
-      if (!businessName || !category || !businessAddress || !businessCity || !businessState || !businessPincode) {
-        return NextResponse.json({ error: "Missing required business fields" }, { status: 400 });
-      }
-
-      user = await createSeller({
-        name,
-        email,
-        password: hashedPassword,
-        phone,
-        businessName,
-        category,
-        subcategories: subcategories ? JSON.stringify(subcategories) : '[]',
-        businessAddress,
-        businessCity,
-        businessState,
-        businessPincode,
-        businessArea,
-        businessLocality,
-        businessDescription,
-        businessImage,
-        deliveryTime: '30-45 min'
+      response.cookies.set("userInfo", JSON.stringify(userSession), {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60, // 7 days
       });
-      userTypeForResponse = 'SELLER';
-    } else if (userType === 'DELIVERY_AGENT') {
-      // Check if delivery agent already exists
-      const existingDeliveryAgent = await findDeliveryAgentByEmail(email);
-      if (existingDeliveryAgent) {
-        return NextResponse.json({ error: "Delivery agent already exists" }, { status: 409 });
-      }
-
-      if (!vehicleNumber || !vehicleType) {
-        return NextResponse.json({ error: "Missing required delivery agent fields" }, { status: 400 });
-      }
-
-      user = await createDeliveryAgent({
-        name,
-        email,
-        password: hashedPassword,
-        phone,
-        vehicleNumber,
-        vehicleType
+      response.cookies.set("userType", userTypeForResponse, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60, // 7 days
       });
-      userTypeForResponse = 'DELIVERY_AGENT';
-    } else {
-      return NextResponse.json({ error: "Invalid user type" }, { status: 400 });
+      response.cookies.set("userId", user.id.toString(), {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+      });
+      console.log(`User registered: ${userTypeForResponse} - ${user.email} (ID: ${user.id})`);
+      return response;
     }
 
-    // Store user session with complete data
-    const userSession = await storeUserSession(userTypeForResponse, user.id);
-
-    const response = NextResponse.json({ 
-      success: true, 
-      message: `Successfully registered as ${userTypeForResponse}`,
-      user: userSession
-    });
-
-    // Set userInfo cookie with complete user data
-    response.cookies.set("userInfo", JSON.stringify(userSession), {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-    });
-
-    // Set userType cookie for quick access
-    response.cookies.set("userType", userTypeForResponse, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-    });
-
-    // Set userId cookie
-    response.cookies.set("userId", user.id.toString(), {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-    });
-
-    console.log(`User registered: ${userTypeForResponse} - ${user.email} (ID: ${user.id})`);
-
-    return response;
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
     console.error("Registration error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

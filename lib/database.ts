@@ -40,6 +40,16 @@ export const findCustomerById = async (id: number) => {
   return customer
 }
 
+export const findCustomerByPhone = async (phone: string) => {
+  const { data: customer, error } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('phone', phone)
+    .single()
+  if (error) return null
+  return customer
+}
+
 // Seller functions
 export const createSeller = async (data: {
   name: string
@@ -88,6 +98,16 @@ export const findSellerById = async (id: number) => {
   return seller
 }
 
+export const findSellerByPhone = async (phone: string) => {
+  const { data: seller, error } = await supabase
+    .from('sellers')
+    .select('*')
+    .eq('phone', phone)
+    .single()
+  if (error) return null
+  return seller
+}
+
 // Delivery Agent functions
 export const createDeliveryAgent = async (data: {
   name: string
@@ -121,6 +141,16 @@ export const findDeliveryAgentById = async (id: number) => {
     .from('delivery_agents')
     .select('*')
     .eq('id', id)
+    .single()
+  if (error) return null
+  return agent
+}
+
+export const findDeliveryAgentByPhone = async (phone: string) => {
+  const { data: agent, error } = await supabase
+    .from('delivery_agents')
+    .select('*')
+    .eq('phone', phone)
     .single()
   if (error) return null
   return agent
@@ -300,4 +330,86 @@ export const createPayment = async (data: {
     .single()
   if (error) throw error
   return payment
+}
+
+// OTP generation utility
+export function generateParcelOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+}
+
+// Store OTP for an order
+export const setOrderParcelOTP = async (orderId: number, otp: string) => {
+  const { error } = await supabase
+    .from('orders')
+    .update({ parcel_otp: otp })
+    .eq('id', orderId)
+  if (error) throw error
+}
+
+// Validate OTP for an order
+export const validateOrderParcelOTP = async (orderId: number, otp: string) => {
+  const { data: order, error } = await supabase
+    .from('orders')
+    .select('parcel_otp')
+    .eq('id', orderId)
+    .single()
+  if (error) throw error
+  return order && order.parcel_otp === otp
+}
+
+// Update delivery agent GPS location for an order
+export const updateOrderDeliveryAgentLocation = async (orderId: number, location: any) => {
+  const { error } = await supabase
+    .from('orders')
+    .update({ delivery_agent_location: location })
+    .eq('id', orderId)
+  if (error) throw error
+}
+
+// Fetch delivery agent GPS location for an order
+export const getOrderDeliveryAgentLocation = async (orderId: number) => {
+  const { data: order, error } = await supabase
+    .from('orders')
+    .select('delivery_agent_location')
+    .eq('id', orderId)
+    .single()
+  if (error) throw error
+  return order?.delivery_agent_location
+}
+
+// In-memory store for login OTPs (for development/demo only)
+const loginOtpStore: Record<string, { otp: string; expiresAt: number }> = {};
+
+/**
+ * Generate a 6-digit OTP for login
+ */
+export function generateLoginOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+/**
+ * Store OTP for a phone/email (keyed by phone for now)
+ */
+export function setLoginOTP(phone: string, otp: string, expiresInSeconds = 300) {
+  loginOtpStore[phone] = {
+    otp,
+    expiresAt: Date.now() + expiresInSeconds * 1000,
+  };
+}
+
+/**
+ * Validate OTP for a phone/email
+ */
+export function validateLoginOTP(phone: string, otp: string): boolean {
+  const entry = loginOtpStore[phone];
+  if (!entry) return false;
+  if (Date.now() > entry.expiresAt) return false;
+  return entry.otp === otp;
+}
+
+/**
+ * Clear OTP after successful login
+ */
+export function clearLoginOTP(phone: string) {
+  delete loginOtpStore[phone];
 } 

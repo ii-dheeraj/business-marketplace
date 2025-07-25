@@ -14,6 +14,7 @@ import { setCookie, getUserInfo } from "@/lib/utils"
 import { CATEGORIES, getSubcategoriesByCategory } from "@/utils/category-data";
 import { indianStates, indianStateCityMap } from "@/utils/indian-location-data";
 import SellerSignupForm from "@/components/SellerSignupForm";
+import { InputOTP } from "@/components/ui/input-otp";
 
 interface AuthModalProps {
   isOpen: boolean
@@ -47,6 +48,9 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
   const [errorMsg, setErrorMsg] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
   const router = useRouter()
+  const [otpStep, setOtpStep] = useState<null | 'otp-requested'>(null);
+  const [otpValue, setOtpValue] = useState("");
+  const [otpPhone, setOtpPhone] = useState("");
 
   useEffect(() => {
     setMode(defaultMode)
@@ -102,155 +106,177 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log("[DEBUG] Form submitted, mode:", mode, "userType:", userType)
-    console.log("[DEBUG] Form data:", formData)
-    setIsLoading(true)
-    setErrorMsg("")
-    setSuccessMsg("")
+  e.preventDefault();
+  console.log("[DEBUG] Form submitted, mode:", mode, "userType:", userType);
+  console.log("[DEBUG] Form data:", formData);
+  setIsLoading(true);
+  setErrorMsg("");
+  setSuccessMsg("");
 
-    // Validate required fields
     if (mode === "login") {
-      if (!formData.email || !formData.password) {
-        setErrorMsg("Please fill all required fields.")
-        setIsLoading(false)
-        return
+    if (!otpStep) {
+      // Step 1: Request OTP
+      if (!formData.phone) {
+        setErrorMsg("Please enter your phone number.");
+        setIsLoading(false);
+        return;
       }
-    } else {
-      if (!formData.name || !formData.email || !formData.password || !userType) {
-        setErrorMsg("Please fill all required fields.")
-        setIsLoading(false)
-        return
-      }
-    }
-    
-    // Validate seller-specific fields
-    if (mode === "register" && userType === "SELLER") {
-      if (!formData.businessName || !formData.category || !formData.businessCity || !formData.phone) {
-        setErrorMsg("Please fill all required business fields.")
-        setIsLoading(false)
-        return
-      }
-    }
-
-    // Validate delivery agent-specific fields
-    if (mode === "register" && userType === "DELIVERY_AGENT") {
-      if (!formData.vehicleNumber || !formData.vehicleType) {
-        setErrorMsg("Please fill all required delivery agent fields.")
-        setIsLoading(false)
-        return
-      }
-    }
-
-    try {
-      if (mode === "login") {
-        // Call login API
+      try {
         const res = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
+            phone: formData.phone,
+            step: "request_otp",
           }),
-        })
-        const data = await res.json()
-        console.log("[DEBUG] Login API response:", data)
-        
+        });
+        const data = await res.json();
         if (!res.ok) {
-          setErrorMsg(data.error || "Login failed")
-          setIsLoading(false)
-          return
+          if (data.error && data.error.toLowerCase().includes("user not found")) {
+            setErrorMsg("Mobile number not registered.");
+    } else {
+            setErrorMsg(data.error || "Failed to send OTP");
+          }
+          setIsLoading(false);
+          return;
         }
-
-        setSuccessMsg(`Successfully logged in as ${data.user.userType}!`)
-        
-        // Store user info in cookie for session management
-        setCookie("userInfo", JSON.stringify(data.user))
-        console.log("[DEBUG] userInfo cookie set:", JSON.stringify(data.user))
-        
-        // Dispatch custom event to notify header about login
-        window.dispatchEvent(new CustomEvent('userLogin', { detail: data.user }))
-        
-        // Redirect based on userType immediately
-        if (data.user.userType === "CUSTOMER") {
-          console.log("[DEBUG] Redirecting to /customer/home")
-          router.push("/customer/home")
-        } else if (data.user.userType === "SELLER") {
-          console.log("[DEBUG] Redirecting to /seller/dashboard")
-          router.push("/seller/dashboard")
-        } else if (data.user.userType === "DELIVERY_AGENT") {
-          console.log("[DEBUG] Redirecting to /delivery/dashboard")
-          router.push("/delivery/dashboard")
-        }
-        handleClose()
-        
-      } else {
-        // Call register API
-        const res = await fetch("/api/auth/register", {
+        setOtpStep("otp-requested");
+        setOtpPhone(data.phone || formData.phone);
+        setSuccessMsg("OTP sent! Please check your phone (or console in dev mode).");
+      } catch (error: any) {
+        setErrorMsg(error.message || "Failed to send OTP");
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    } else {
+      // Step 2: Verify OTP
+      if (!otpValue || !otpPhone) {
+        setErrorMsg("Please enter the OTP sent to your phone.");
+        setIsLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: formData.name,
+            phone: otpPhone,
             email: formData.email,
-            password: formData.password,
-            phone: formData.phone,
-            userType,
-            ...(userType === "SELLER"
-              ? {
-                  businessName: formData.businessName,
-                  category: formData.category,
-                  subcategory: formData.subcategory,
-                  businessState: formData.businessState,
-                  businessCity: formData.businessCity,
-                  businessAddress: formData.businessAddress,
-                  businessArea: formData.businessArea,
-                  businessLocality: formData.businessLocality,
-                  businessDescription: formData.businessDescription,
-                  businessImage: formData.businessImage,
-                }
-              : {}),
-            ...(userType === "DELIVERY_AGENT"
-              ? {
-                  vehicleNumber: formData.vehicleNumber,
-                  vehicleType: formData.vehicleType,
-                }
-              : {}),
+            otp: otpValue,
+            step: "verify_otp",
           }),
-        })
-        const data = await res.json()
-        console.log("Register response:", data)
-        
+        });
+        const data = await res.json();
         if (!res.ok) {
-          setErrorMsg(data.error || "Registration failed")
-          setIsLoading(false)
-          return
+          setErrorMsg(data.error || "OTP verification failed");
+          setIsLoading(false);
+          return;
         }
-
-        setSuccessMsg(`Successfully registered as ${data.user.userType}!`)
-        
-        // Store user info in cookie for session management
-        setCookie("userInfo", JSON.stringify(data.user))
-        
-        // Dispatch custom event to notify header about registration
-        window.dispatchEvent(new CustomEvent('userLogin', { detail: data.user }))
-        
-        // Redirect based on userType immediately
+        setSuccessMsg(`Successfully logged in as ${data.user.userType}!`);
+        setCookie("userInfo", JSON.stringify(data.user));
+        window.dispatchEvent(new CustomEvent('userLogin', { detail: data.user }));
         if (data.user.userType === "CUSTOMER") {
-          router.push("/customer/home")
+          router.push("/customer/home");
         } else if (data.user.userType === "SELLER") {
-          router.push("/seller/dashboard")
+          router.push("/seller/dashboard");
         } else if (data.user.userType === "DELIVERY_AGENT") {
-          router.push("/delivery/dashboard")
+          router.push("/delivery/dashboard");
         }
-        handleClose()
+        handleClose();
+      } catch (error: any) {
+        setErrorMsg(error.message || "OTP verification failed");
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error: any) {
-      console.error("Auth error:", error)
-      setErrorMsg(error.message || "An unexpected error occurred.")
-    } finally {
-      setIsLoading(false)
+      return;
     }
+      } else {
+        // Call register API
+        if (!otpStep) {
+          // Step 1: Request OTP
+          if (!formData.name || !formData.email || !formData.phone || !userType) {
+            setErrorMsg("Please fill all required fields.");
+            setIsLoading(false);
+            return;
+          }
+          try {
+            const res = await fetch("/api/auth/register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...formData,
+                userType,
+                step: "request_otp",
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              setErrorMsg(data.error || "Failed to send OTP");
+              setIsLoading(false);
+              return;
+            }
+            setOtpStep("otp-requested");
+            setOtpPhone(formData.phone);
+            setSuccessMsg("OTP sent! Please check your phone (or console in dev mode).");
+          } catch (error: any) {
+            setErrorMsg(error.message || "Failed to send OTP");
+          } finally {
+            setIsLoading(false);
+          }
+          return;
+        } else {
+          // Step 2: Verify OTP and create account
+          if (!otpValue || !otpPhone) {
+            setErrorMsg("Please enter the OTP sent to your phone.");
+            setIsLoading(false);
+            return;
+          }
+          try {
+            const res = await fetch("/api/auth/register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                phone: otpPhone,
+                otp: otpValue,
+                step: "verify_otp",
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              setErrorMsg(data.error || "OTP verification failed");
+              setIsLoading(false);
+              setOtpValue("");
+              setOtpStep(null);
+              router.refresh();
+              return;
+            }
+            setSuccessMsg(`Successfully registered as ${data.user.userType}!`);
+            setCookie("userInfo", JSON.stringify(data.user));
+            window.dispatchEvent(new CustomEvent('userLogin', { detail: data.user }));
+            setOtpValue("");
+            setOtpStep(null);
+            router.refresh();
+            if (data.user.userType === "CUSTOMER") {
+              router.push("/customer/home");
+            } else if (data.user.userType === "SELLER") {
+              router.push("/seller/dashboard");
+            } else if (data.user.userType === "DELIVERY_AGENT") {
+              router.push("/delivery/dashboard");
+            }
+            handleClose();
+          } catch (error: any) {
+            setErrorMsg(error.message || "OTP verification failed");
+            setOtpValue("");
+            setOtpStep(null);
+            router.refresh();
+          } finally {
+            setIsLoading(false);
+          }
+          return;
+        }
   }
+};
 
   const userTypes = [
     {
@@ -343,43 +369,63 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
               </TabsList>
 
               <TabsContent value="login" className="space-y-6">
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Email</label>
-                    <Input
-                      name="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className="h-12 text-base"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Password</label>
-                    <div className="relative">
+                <form onSubmit={handleSubmit}>
+                  {!otpStep ? (
+                    <>
                       <Input
-                        name="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter your password"
-                        value={formData.password}
+                        name="phone"
+                        type="tel"
+                        placeholder="Enter your phone number"
+                        value={formData.phone}
                         onChange={handleInputChange}
-                        className="h-12 text-base pr-12"
+                        className="mb-2"
                         required
+                        maxLength={15}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
+                      <Button type="submit" disabled={isLoading} className="w-full mt-2">
+                        {isLoading ? "Sending OTP..." : "Send OTP"}
+                      </Button>
+                      <div className="text-xs text-gray-500 mt-2">Or <span className="underline cursor-pointer" onClick={() => setOtpStep(null)}>login with password</span></div>
+                    </>
+                  ) : (
+                    <>
+                      <label htmlFor="otp-input" className="block mb-2 text-sm font-medium text-gray-700">
+                        Enter the 6-digit OTP sent to your phone
+                      </label>
+                      <InputOTP
+                        id="otp-input"
+                        value={otpValue}
+                        onChange={setOtpValue}
+                        maxLength={6}
+                        containerClassName="mb-2"
+                        render={({ slots }) => (
+                          <div className="flex gap-2">
+                            {slots.map((slot, idx) => (
+                              <div
+                                key={idx}
+                                className="relative flex h-10 w-10 items-center justify-center border-y border-r border-input text-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md"
+                              >
+                                {slot.char}
+                                {slot.hasFakeCaret && (
+                                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                    <div className="h-4 w-px animate-caret-blink bg-foreground duration-1000" />
+                                  </div>
+                                )}
                     </div>
+                            ))}
                   </div>
-                  <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
-                    {isLoading ? "Signing In..." : "Sign In"}
+                        )}
+                      />
+                      <Button type="submit" disabled={isLoading} className="w-full mt-2">
+                        {isLoading ? "Verifying..." : "Verify OTP & Login"}
                   </Button>
+                      <div className="text-xs text-gray-500 mt-2">
+                        Didn't get OTP? <span className="underline cursor-pointer" onClick={() => { setOtpStep(null); setOtpValue(""); }}>Resend</span>
+                      </div>
+                    </>
+                  )}
+                  {errorMsg && <div className="text-red-600 text-sm mt-2">{errorMsg}</div>}
+                  {successMsg && <div className="text-green-600 text-sm mt-2">{successMsg}</div>}
                 </form>
               </TabsContent>
 
@@ -425,138 +471,47 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                         maxLength={10}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Password</label>
-                      <div className="relative">
-                        <Input
-                          name="password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Create a password"
-                          value={formData.password}
-                          onChange={handleInputChange}
-                          className="h-12 text-base pr-12"
-                          required
-                          minLength={6}
+                    {/* OTP Step */}
+                    {otpStep === "otp-requested" ? (
+                      <>
+                        <label htmlFor="signup-otp-input" className="block mb-2 text-sm font-medium text-gray-700">
+                          Enter the 6-digit OTP sent to your phone
+                        </label>
+                        <InputOTP
+                          id="signup-otp-input"
+                          value={otpValue}
+                          onChange={setOtpValue}
+                          maxLength={6}
+                          containerClassName="mb-2"
+                          render={({ slots }) => (
+                            <div className="flex gap-2">
+                              {slots.map((slot, idx) => (
+                                <div
+                                  key={idx}
+                                  className="relative flex h-10 w-10 items-center justify-center border-y border-r border-input text-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md"
+                                >
+                                  {slot.char || <span className="text-gray-400">*</span>}
+                                  {slot.hasFakeCaret && (
+                                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                      <div className="h-4 w-px animate-caret-blink bg-foreground duration-1000" />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {userType === "SELLER" && (
-                      <>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">Business Name <span className="text-red-500">*</span></label>
-                          <Input
-                            name="businessName"
-                            type="text"
-                            placeholder="Enter your business name"
-                            value={formData.businessName}
-                            onChange={handleInputChange}
-                            className="h-12 text-base"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">Category <span className="text-red-500">*</span></label>
-                          <select
-                            name="category"
-                            value={formData.category}
-                            onChange={e => {
-                              handleInputChange({ target: { name: "category", value: e.target.value } } as any);
-                              handleInputChange({ target: { name: "subcategory", value: "" } } as any);
-                            }}
-                            required
-                            className="w-full border rounded px-2 py-2 h-12 text-base"
-                          >
-                            <option value="">Select Category</option>
-                            {CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                          </select>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">Subcategory <span className="text-red-500">*</span></label>
-                          <select
-                            name="subcategory"
-                            value={formData.subcategory}
-                            onChange={handleInputChange}
-                            required
-                            className="w-full border rounded px-2 py-2 h-12 text-base"
-                            disabled={!formData.category}
-                          >
-                            <option value="">{formData.category ? "Select Subcategory" : "Select Category first"}</option>
-                            {formData.category && getSubcategoriesByCategory(formData.category).map((sub: string) => <option key={sub} value={sub}>{sub}</option>)}
-                          </select>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">State <span className="text-red-500">*</span></label>
-                          <select
-                            name="businessState"
-                            value={formData.businessState}
-                            onChange={e => {
-                              handleInputChange({ target: { name: "businessState", value: e.target.value } } as any);
-                              handleInputChange({ target: { name: "businessCity", value: "" } } as any);
-                            }}
-                            required
-                            className="w-full border rounded px-2 py-2 h-12 text-base"
-                          >
-                            <option value="">Select State</option>
-                            {indianStates.map(state => <option key={state} value={state}>{state}</option>)}
-                          </select>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">City <span className="text-red-500">*</span></label>
-                          <select
-                            name="businessCity"
-                            value={formData.businessCity}
-                            onChange={handleInputChange}
-                            required
-                            className="w-full border rounded px-2 py-2 h-12 text-base"
-                            disabled={!formData.businessState}
-                          >
-                            <option value="">{formData.businessState ? "Select City" : "Select State first"}</option>
-                            {formData.businessState && indianStateCityMap[formData.businessState]?.map((city: string) => <option key={city} value={city}>{city}</option>)}
-                          </select>
-                        </div>
+                        <Button type="submit" disabled={isLoading} className="w-full mt-2">
+                          {isLoading ? "Verifying..." : "Verify OTP & Create Account"}
+                        </Button>
                       </>
+                    ) : (
+                      <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
+                        {isLoading ? "Sending OTP..." : "Create Account"}
+                      </Button>
                     )}
-
-                    {userType === "DELIVERY_AGENT" && (
-                      <>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">Vehicle Number</label>
-                          <Input
-                            name="vehicleNumber"
-                            type="text"
-                            placeholder="Enter your vehicle number"
-                            value={formData.vehicleNumber}
-                            onChange={handleInputChange}
-                            className="h-12 text-base"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">Vehicle Type</label>
-                          <Input
-                            name="vehicleType"
-                            type="text"
-                            placeholder="e.g., Motorcycle, Car, Bicycle"
-                            value={formData.vehicleType}
-                            onChange={handleInputChange}
-                            className="h-12 text-base"
-                            required
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
-                      {isLoading ? "Creating Account..." : "Create Account"}
-                    </Button>
+                    {errorMsg && <div className="text-red-600 text-sm mt-2">{errorMsg}</div>}
+                    {successMsg && <div className="text-green-600 text-sm mt-2">{successMsg}</div>}
                   </form>
                 )}
               </TabsContent>

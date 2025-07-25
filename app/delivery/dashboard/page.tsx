@@ -27,6 +27,11 @@ export default function DeliveryDashboard() {
   const [agentId, setAgentId] = useState<number | null>(null)
   const [stats, setStats] = useState<any>({ totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
 
+  // Add OTP and GPS tracking logic inside DeliveryDashboard
+  const [otpInput, setOtpInput] = useState("");
+  const [otpStatus, setOtpStatus] = useState("");
+  const [locationStatus, setLocationStatus] = useState("");
+
   useEffect(() => {
     // Get delivery agent name and id from userInfo cookie
     const userInfoCookie = getCookie("userInfo")
@@ -123,6 +128,57 @@ export default function DeliveryDashboard() {
       }
     } catch {}
   }
+
+  // Function to handle OTP submit for a given order
+  const handleOtpSubmit = async (orderId: string) => {
+    setOtpStatus("Validating...");
+    const res = await fetch("/api/delivery/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "validate_otp", orderId, otp: otpInput })
+    });
+    const data = await res.json();
+    if (data.success) {
+      setOtpStatus("OTP Validated! Parcel picked.");
+      setOtpInput("");
+      refreshOrders();
+    } else {
+      setOtpStatus(data.error || "Invalid OTP");
+    }
+  };
+
+  // Function to update GPS location for all active deliveries
+  const updateLocation = async () => {
+    if (!agentId || !activeDeliveries.length) return;
+    if (!navigator.geolocation) {
+      setLocationStatus("Geolocation not supported");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      setLocationStatus("Updating location...");
+      for (const delivery of activeDeliveries) {
+        await fetch("/api/delivery/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "update_location",
+            orderId: delivery.id,
+            deliveryAgentId: agentId,
+            location: { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          })
+        });
+      }
+      setLocationStatus("Location updated");
+    }, () => setLocationStatus("Failed to get location"));
+  };
+
+  useEffect(() => {
+    if (activeDeliveries.length) {
+      updateLocation();
+      const interval = setInterval(updateLocation, 10000); // update every 10s
+      return () => clearInterval(interval);
+    }
+  }, [activeDeliveries, agentId]);
 
   const handleViewRoute = (pickup: string, delivery: string) => {
     const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(delivery)}`
@@ -312,6 +368,24 @@ export default function DeliveryDashboard() {
                         <span>ETA: {delivery.estimatedTime}</span>
                       </div>
 
+                      {delivery.status === "READY_FOR_PICKUP" && (
+                        <div className="flex flex-col gap-2 mt-2">
+                          <label htmlFor={`otp-${delivery.id}`}>Enter OTP from Seller:</label>
+                          <input
+                            id={`otp-${delivery.id}`}
+                            type="text"
+                            value={otpInput}
+                            onChange={e => setOtpInput(e.target.value)}
+                            className="border rounded px-2 py-1"
+                            maxLength={6}
+                          />
+                          <Button onClick={() => handleOtpSubmit(delivery.id)}>
+                            Confirm Parcel Pickup
+                          </Button>
+                          {otpStatus && <span className="text-xs text-blue-600">{otpStatus}</span>}
+                        </div>
+                      )}
+
                       <div className="flex gap-2">
                         <Button onClick={() => handleCompleteDelivery(delivery.id)} className="flex-1">
                           <CheckCircle className="h-4 w-4 mr-2" />
@@ -326,6 +400,7 @@ export default function DeliveryDashboard() {
                           Call Customer
                         </Button>
                       </div>
+                      {locationStatus && <div className="text-xs text-blue-600 mt-2">{locationStatus}</div>}
                     </CardContent>
                   </Card>
                 ))}
