@@ -13,18 +13,21 @@ export async function POST(request: NextRequest) {
       if (!phone && !email) {
         return NextResponse.json({ error: "Missing phone or email" }, { status: 400 });
       }
-      // Find user by phone or email
+      // Only check the selected userType's table
       let user: any = null;
-      let userType: string = '';
+      let type: string = body.userType;
       if (phone) {
-        user = await findCustomerByPhone(phone) || await findSellerByPhone(phone) || await findDeliveryAgentByPhone(phone);
+        if (type === 'CUSTOMER') user = await findCustomerByPhone(phone);
+        else if (type === 'SELLER') user = await findSellerByPhone(phone);
+        else if (type === 'DELIVERY_AGENT') user = await findDeliveryAgentByPhone(phone);
       } else if (email) {
-        user = await findCustomerByEmail(email) || await findSellerByEmail(email) || await findDeliveryAgentByEmail(email);
+        if (type === 'CUSTOMER') user = await findCustomerByEmail(email);
+        else if (type === 'SELLER') user = await findSellerByEmail(email);
+        else if (type === 'DELIVERY_AGENT') user = await findDeliveryAgentByEmail(email);
       }
       if (!user) {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
-      // Use phone from user record if not provided
       const userPhone = user.phone || phone;
       if (!userPhone) {
         return NextResponse.json({ error: "User does not have a phone number on record" }, { status: 400 });
@@ -40,10 +43,12 @@ export async function POST(request: NextRequest) {
       if (!phone || !otp) {
         return NextResponse.json({ error: "Missing phone or OTP" }, { status: 400 });
       }
-      // Find user by phone
+      // Only check the selected userType's table
       let user: any = null;
-      let userType: string = '';
-      user = await findCustomerByPhone(phone) || await findSellerByPhone(phone) || await findDeliveryAgentByPhone(phone);
+      let type: string = body.userType;
+      if (type === 'CUSTOMER') user = await findCustomerByPhone(phone);
+      else if (type === 'SELLER') user = await findSellerByPhone(phone);
+      else if (type === 'DELIVERY_AGENT') user = await findDeliveryAgentByPhone(phone);
       if (!user) {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
@@ -52,21 +57,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 401 });
       }
       clearLoginOTP(userPhone);
-      // Determine userType
-      if (user.role || user.userType) {
-        userType = user.role || user.userType;
-      } else if (user.businessName) {
-        userType = 'SELLER';
-      } else if (user.vehicleNumber) {
-        userType = 'DELIVERY_AGENT';
-      } else {
-        userType = 'CUSTOMER';
-      }
       // Store user session
-      const userSession = await storeUserSession(userType, user.id);
+      const userSession = await storeUserSession(type, user.id);
       const response = NextResponse.json({ 
         success: true, 
-        message: `Successfully logged in as ${userType}`,
+        message: `Successfully logged in as ${type}`,
         user: userSession
       });
       response.cookies.set("userInfo", JSON.stringify(userSession), {
@@ -75,7 +70,7 @@ export async function POST(request: NextRequest) {
         sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60, // 7 days
       });
-      response.cookies.set("userType", userType, {
+      response.cookies.set("userType", type, {
         httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
@@ -87,7 +82,7 @@ export async function POST(request: NextRequest) {
         sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60, // 7 days
       });
-      console.log(`User logged in via OTP: ${userType} - ${user.email} (ID: ${user.id})`);
+      console.log(`User logged in via OTP: ${type} - ${user.email} (ID: ${user.id})`);
       return response;
     }
 

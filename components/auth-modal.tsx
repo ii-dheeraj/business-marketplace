@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { User, Store, Truck, Eye, EyeOff } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { setCookie, getUserInfo } from "@/lib/utils"
@@ -15,6 +15,7 @@ import { CATEGORIES, getSubcategoriesByCategory } from "@/utils/category-data";
 import { indianStates, indianStateCityMap } from "@/utils/indian-location-data";
 import SellerSignupForm from "@/components/SellerSignupForm";
 import { InputOTP } from "@/components/ui/input-otp";
+import DeliveryAgentSignupForm from "@/components/DeliveryAgentSignupForm";
 
 interface AuthModalProps {
   isOpen: boolean
@@ -79,6 +80,9 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
     setShowPassword(false)
     setErrorMsg("")
     setSuccessMsg("")
+    setOtpStep(null)
+    setOtpValue("")
+    setOtpPhone("")
   }
 
   const handleClose = () => {
@@ -114,83 +118,98 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
   setSuccessMsg("");
 
     if (mode === "login") {
-    if (!otpStep) {
-      // Step 1: Request OTP
-      if (!formData.phone) {
-        setErrorMsg("Please enter your phone number.");
+      if (!userType) {
+        setErrorMsg("Please select your role (Customer, Seller, or Delivery Agent)");
         setIsLoading(false);
         return;
       }
-      try {
-        const res = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            phone: formData.phone,
-            step: "request_otp",
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          if (data.error && data.error.toLowerCase().includes("user not found")) {
-            setErrorMsg("Mobile number not registered.");
+      if (!otpStep) {
+        // Step 1: Request OTP
+        if (!formData.phone) {
+          setErrorMsg("Please enter your phone number.");
+          setIsLoading(false);
+          return;
+        }
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phone: formData.phone,
+              userType,
+              step: "request_otp",
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            if (data.error && data.error.toLowerCase().includes("user not found")) {
+              setErrorMsg("Mobile number not registered.");
     } else {
-            setErrorMsg(data.error || "Failed to send OTP");
+              setErrorMsg(data.error || "Failed to send OTP");
+            }
+            setIsLoading(false);
+            return;
           }
+          setOtpStep("otp-requested");
+          setOtpPhone(data.phone || formData.phone);
+          setSuccessMsg("OTP sent! Please check your phone (or console in dev mode).");
+        } catch (error: any) {
+          setErrorMsg(error.message || "Failed to send OTP");
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      } else {
+        // Step 2: Verify OTP
+        if (!otpValue || !otpPhone) {
+          setErrorMsg("Please enter the OTP sent to your phone.");
           setIsLoading(false);
           return;
         }
-        setOtpStep("otp-requested");
-        setOtpPhone(data.phone || formData.phone);
-        setSuccessMsg("OTP sent! Please check your phone (or console in dev mode).");
-      } catch (error: any) {
-        setErrorMsg(error.message || "Failed to send OTP");
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    } else {
-      // Step 2: Verify OTP
-      if (!otpValue || !otpPhone) {
-        setErrorMsg("Please enter the OTP sent to your phone.");
-        setIsLoading(false);
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phone: otpPhone,
+              otp: otpValue,
+              userType,
+              step: "verify_otp",
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            setErrorMsg(data.error || "OTP verification failed");
+            setIsLoading(false);
+            setOtpValue("");
+            setOtpStep(null);
+            router.refresh();
+            return;
+          }
+          setSuccessMsg(`Successfully logged in as ${data.user.userType}!`);
+          setCookie("userInfo", JSON.stringify(data.user));
+          window.dispatchEvent(new CustomEvent('userLogin', { detail: data.user }));
+          setOtpValue("");
+          setOtpStep(null);
+          router.refresh();
+          if (data.user.userType === "CUSTOMER") {
+            router.push("/customer/home");
+          } else if (data.user.userType === "SELLER") {
+            router.push("/seller/dashboard");
+          } else if (data.user.userType === "DELIVERY_AGENT") {
+            router.push("/delivery/dashboard");
+          }
+          handleClose();
+        } catch (error: any) {
+          setErrorMsg(error.message || "OTP verification failed");
+          setOtpValue("");
+          setOtpStep(null);
+          router.refresh();
+        } finally {
+          setIsLoading(false);
+        }
         return;
       }
-      try {
-        const res = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            phone: otpPhone,
-            email: formData.email,
-            otp: otpValue,
-            step: "verify_otp",
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setErrorMsg(data.error || "OTP verification failed");
-          setIsLoading(false);
-          return;
-        }
-        setSuccessMsg(`Successfully logged in as ${data.user.userType}!`);
-        setCookie("userInfo", JSON.stringify(data.user));
-        window.dispatchEvent(new CustomEvent('userLogin', { detail: data.user }));
-        if (data.user.userType === "CUSTOMER") {
-          router.push("/customer/home");
-        } else if (data.user.userType === "SELLER") {
-          router.push("/seller/dashboard");
-        } else if (data.user.userType === "DELIVERY_AGENT") {
-          router.push("/delivery/dashboard");
-        }
-        handleClose();
-      } catch (error: any) {
-        setErrorMsg(error.message || "OTP verification failed");
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
       } else {
         // Call register API
         if (!otpStep) {
@@ -256,15 +275,21 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
             window.dispatchEvent(new CustomEvent('userLogin', { detail: data.user }));
             setOtpValue("");
             setOtpStep(null);
-            router.refresh();
-            if (data.user.userType === "CUSTOMER") {
-              router.push("/customer/home");
-            } else if (data.user.userType === "SELLER") {
-              router.push("/seller/dashboard");
-            } else if (data.user.userType === "DELIVERY_AGENT") {
-              router.push("/delivery/dashboard");
-            }
+            
+            // Close modal first
             handleClose();
+            
+            // Then redirect after a small delay
+            setTimeout(() => {
+              router.refresh();
+              if (data.user.userType === "CUSTOMER") {
+                router.push("/customer/home");
+              } else if (data.user.userType === "SELLER") {
+                router.push("/seller/dashboard");
+              } else if (data.user.userType === "DELIVERY_AGENT") {
+                router.push("/delivery/dashboard");
+              }
+            }, 500);
           } catch (error: any) {
             setErrorMsg(error.message || "OTP verification failed");
             setOtpValue("");
@@ -313,6 +338,17 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
           <DialogTitle className="text-2xl font-bold text-gray-900">
             {!userType ? "Choose Your Role" : `${mode === "login" ? "Sign In" : "Sign Up"} as ${userType}`}
           </DialogTitle>
+          <DialogDescription className="text-sm text-gray-600">
+            {userType ? (
+              mode === "login" ? (
+                "Enter your phone number to receive an OTP for login."
+              ) : (
+                "Enter your phone number to receive an OTP for registration."
+              )
+            ) : (
+              "Select how you want to use LocalMarket."
+            )}
+          </DialogDescription>
         </DialogHeader>
         
         {errorMsg && (
@@ -432,6 +468,8 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
               <TabsContent value="register" className="space-y-6">
                 {userType === "SELLER" && mode === "register" ? (
                   <SellerSignupForm onSuccess={handleClose} />
+                ) : userType === "DELIVERY_AGENT" && mode === "register" ? (
+                  <DeliveryAgentSignupForm onSuccess={handleClose} />
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-2">

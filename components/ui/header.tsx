@@ -15,26 +15,45 @@ export default function Header() {
   const router = useRouter()
 
   useEffect(() => {
-    const userInfoCookie = getCookie("userInfo")
-    if (userInfoCookie) {
-      try {
-        const user = JSON.parse(userInfoCookie)
-        setUserInfo(user)
-        setUserType(user.userType)
-      } catch {
+    const checkInitialAuth = () => {
+      const userInfoCookie = getCookie("userInfo")
+      const userTypeCookie = getCookie("userType")
+      console.log("[Header] Initial check - userInfo cookie:", userInfoCookie ? "exists" : "missing")
+      console.log("[Header] Initial check - userType cookie:", userTypeCookie ? "exists" : "missing")
+      console.log("[Header] Initial check - userInfo cookie value:", userInfoCookie)
+      console.log("[Header] Initial check - userType cookie value:", userTypeCookie)
+      
+      if (userInfoCookie) {
+        try {
+          const user = JSON.parse(userInfoCookie)
+          console.log("[Header] Initial check - parsed user:", user)
+          setUserInfo(user)
+          setUserType(user.userType || userTypeCookie || "")
+        } catch (error) {
+          console.log("[Header] Initial check - error parsing userInfo cookie:", error)
+          setUserInfo(null)
+          setUserType("")
+        }
+      } else {
         setUserInfo(null)
         setUserType("")
       }
-    } else {
-      setUserInfo(null)
-      setUserType("")
     }
+
+    // Check immediately
+    checkInitialAuth()
+    
+    // Also check after a small delay to ensure cookies are loaded
+    setTimeout(checkInitialAuth, 100)
+    setTimeout(checkInitialAuth, 500)
+    setTimeout(checkInitialAuth, 1000)
   }, [])
 
   // Listen for login events to update header state
   useEffect(() => {
     const handleUserLogin = (event: CustomEvent) => {
       const user = event.detail
+      console.log("[Header] userLogin event received:", user)
       setUserInfo(user)
       setUserType(user.userType)
     }
@@ -45,6 +64,42 @@ export default function Header() {
       window.removeEventListener('userLogin', handleUserLogin as EventListener)
     }
   }, [])
+
+  // Periodic check to ensure header state is correct
+  useEffect(() => {
+    const checkAuthState = () => {
+      const userInfoCookie = getCookie("userInfo")
+      if (userInfoCookie && !userInfo) {
+        console.log("[Header] Periodic check: Found cookie but no userInfo state, updating...")
+        try {
+          const user = JSON.parse(userInfoCookie)
+          setUserInfo(user)
+          setUserType(user.userType)
+        } catch (error) {
+          console.log("[Header] Periodic check: Error parsing cookie:", error)
+        }
+      }
+    }
+
+    // Check immediately
+    checkAuthState()
+    
+    // Check every 2 seconds
+    const interval = setInterval(checkAuthState, 2000)
+    
+    // Check when window gains focus
+    const handleFocus = () => {
+      console.log("[Header] Window focused, checking auth state...")
+      checkAuthState()
+    }
+    
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [userInfo])
 
   const handleLogout = () => {
     deleteCookie("userInfo")
@@ -58,6 +113,30 @@ export default function Header() {
     setAuthModalOpen(true)
   }
 
+  const refreshAuthState = () => {
+    console.log("[Header] Manual refresh triggered")
+    const userInfoCookie = getCookie("userInfo")
+    const userTypeCookie = getCookie("userType")
+    console.log("[Header] Manual refresh - userInfo:", userInfoCookie ? "exists" : "missing")
+    console.log("[Header] Manual refresh - userType:", userTypeCookie)
+    
+    if (userInfoCookie) {
+      try {
+        const user = JSON.parse(userInfoCookie)
+        console.log("[Header] Manual refresh - parsed user:", user)
+        setUserInfo(user)
+        setUserType(user.userType || userTypeCookie || "")
+      } catch (error) {
+        console.log("[Header] Manual refresh - error parsing:", error)
+        setUserInfo(null)
+        setUserType("")
+      }
+    } else {
+      setUserInfo(null)
+      setUserType("")
+    }
+  }
+
   return (
     <header className="bg-white shadow-sm border-b sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -68,6 +147,8 @@ export default function Header() {
             </Link>
           </div>
           <div className="flex items-center space-x-4">
+
+            
             {userInfo && userType?.toUpperCase() === "CUSTOMER" && (
               <Link href="/customer/orders">
                 <Button

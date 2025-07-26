@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import {
   Package,
   ShoppingCart,
@@ -35,7 +35,9 @@ import {
   Store,
   Save,
   Navigation,
+  Users,
 } from "lucide-react"
+import CustomerSignupForm from "@/components/CustomerSignupForm"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -174,20 +176,61 @@ export default function SellerDashboard() {
   };
 
   useEffect(() => {
-    const userInfoCookie = getCookie("userInfo")
-    if (userInfoCookie) {
-      try {
-        const user = JSON.parse(userInfoCookie)
-        setSellerInfo(user)
-      } catch {
+    const checkAuth = () => {
+      const userInfoCookie = getCookie("userInfo")
+      const userTypeCookie = getCookie("userType")
+      
+      console.log("[DEBUG] Auth check - userInfo:", userInfoCookie ? "exists" : "missing")
+      console.log("[DEBUG] Auth check - userType:", userTypeCookie)
+      console.log("[DEBUG] Raw userInfo cookie value:", userInfoCookie)
+      console.log("[DEBUG] userInfo cookie length:", userInfoCookie?.length)
+      console.log("[DEBUG] userInfo cookie type:", typeof userInfoCookie)
+      
+      if (userInfoCookie && userTypeCookie === "SELLER") {
+        try {
+          console.log("[DEBUG] Attempting to parse userInfo cookie...")
+          
+          // Try to decode the cookie if it's URL encoded
+          let decodedCookie = userInfoCookie
+          try {
+            decodedCookie = decodeURIComponent(userInfoCookie)
+            console.log("[DEBUG] Decoded cookie:", decodedCookie)
+          } catch (decodeError) {
+            console.log("[DEBUG] Cookie is not URL encoded, using as-is")
+          }
+          
+          const user = JSON.parse(decodedCookie)
+          console.log("[DEBUG] Parsed user object:", user)
+          console.log("[DEBUG] Setting seller info:", user)
+          setSellerInfo(user)
+          setIsLoading(false)
+          return // Success - don't redirect
+        } catch (error) {
+          console.log("[DEBUG] Failed to parse userInfo cookie:", error)
+          console.log("[DEBUG] Cookie value that failed to parse:", userInfoCookie)
+          console.log("[DEBUG] Cookie value (stringified):", JSON.stringify(userInfoCookie))
+          
+          // Try to fix the cookie by clearing it and redirecting to login
+          console.log("[DEBUG] Clearing corrupted cookie and redirecting to login")
+          setSellerInfo(null)
+          router.push("/auth/login")
+        }
+      } else {
+        console.log("[DEBUG] Missing auth - userInfo:", !!userInfoCookie, "userType:", userTypeCookie)
         setSellerInfo(null)
-        router.push("/auth/login")
+        if (userTypeCookie && userTypeCookie !== "SELLER") {
+          // User is logged in but not a seller
+          router.push("/")
+        } else {
+          // User is not logged in
+          router.push("/auth/login")
+        }
       }
-    } else {
-      setSellerInfo(null)
-      router.push("/auth/login")
+      setIsLoading(false)
     }
-    setIsLoading(false)
+    
+    // Add a small delay to ensure cookies are set after registration
+    setTimeout(checkAuth, 500)
   }, [router])
 
   // Fetch data when sellerInfo is available
@@ -335,6 +378,57 @@ export default function SellerDashboard() {
     }
   }
 
+  useEffect(() => {
+    if (!GOOGLE_MAPS_API_KEY || trackingOrders.length === 0) return;
+    trackingOrders.forEach(order => {
+      const mapId = `live-map-${order.id}`;
+      if (!order.customerAddress) return;
+      loadGoogleMapsScript(GOOGLE_MAPS_API_KEY, () => {
+        if (!(window as any).google || !(window as any).google.maps) return;
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const origin = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            const map = new (window as any).google.maps.Map(document.getElementById(mapId), {
+              zoom: 14,
+              center: origin,
+            });
+            const directionsService = new (window as any).google.maps.DirectionsService();
+            const directionsRenderer = new (window as any).google.maps.DirectionsRenderer();
+            directionsRenderer.setMap(map);
+            directionsService.route(
+              {
+                origin,
+                destination: order.customerAddress,
+                travelMode: "DRIVING",
+              },
+              (result: any, status: string) => {
+                if (status === "OK") {
+                  directionsRenderer.setDirections(result);
+                }
+              }
+            );
+          },
+          (error) => {
+            // fallback: just show destination
+            const map = new (window as any).google.maps.Map(document.getElementById(mapId), {
+              zoom: 14,
+              center: { lat: 20.5937, lng: 78.9629 }, // India center
+            });
+            new (window as any).google.maps.Marker({
+              position: { lat: 20.5937, lng: 78.9629 },
+              map,
+              title: "Could not get your location",
+            });
+          }
+        );
+      });
+    });
+  }, [trackingOrders, GOOGLE_MAPS_API_KEY]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -422,7 +516,7 @@ export default function SellerDashboard() {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="products" className="text-xs sm:text-sm">
               <Package className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Products</span>
@@ -442,6 +536,11 @@ export default function SellerDashboard() {
               <Store className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Profile</span>
               <span className="sm:hidden">Profile</span>
+            </TabsTrigger>
+            <TabsTrigger value="customers" className="text-xs sm:text-sm">
+              <Users className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Customers</span>
+              <span className="sm:hidden">Customers</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="text-xs sm:text-sm">
               <Settings className="h-4 w-4 mr-1 sm:mr-2" />
@@ -593,6 +692,9 @@ export default function SellerDashboard() {
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Edit Product - {editingProduct?.name}</DialogTitle>
+                  <DialogDescription>
+                    Update the product details below. Click Save Changes when you're done.
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -753,52 +855,6 @@ export default function SellerDashboard() {
                 <h3 className="text-lg font-bold mb-2">Live Delivery Tracking</h3>
                 {trackingOrders.map((order) => {
                   const mapId = `live-map-${order.id}`;
-                  useEffect(() => {
-                    if (!GOOGLE_MAPS_API_KEY || !order.customerAddress) return;
-                    loadGoogleMapsScript(GOOGLE_MAPS_API_KEY, () => {
-                      if (!(window as any).google || !(window as any).google.maps) return;
-                      if (!navigator.geolocation) return;
-                      navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                          const origin = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude,
-                          };
-                          const map = new (window as any).google.maps.Map(document.getElementById(mapId), {
-                            zoom: 14,
-                            center: origin,
-                          });
-                          const directionsService = new (window as any).google.maps.DirectionsService();
-                          const directionsRenderer = new (window as any).google.maps.DirectionsRenderer();
-                          directionsRenderer.setMap(map);
-                          directionsService.route(
-                            {
-                              origin,
-                              destination: order.customerAddress,
-                              travelMode: "DRIVING",
-                            },
-                            (result: any, status: string) => {
-                              if (status === "OK") {
-                                directionsRenderer.setDirections(result);
-                              }
-                            }
-                          );
-                        },
-                        (error) => {
-                          // fallback: just show destination
-                          const map = new (window as any).google.maps.Map(document.getElementById(mapId), {
-                            zoom: 14,
-                            center: { lat: 20.5937, lng: 78.9629 }, // India center
-                          });
-                          new (window as any).google.maps.Marker({
-                            position: { lat: 20.5937, lng: 78.9629 },
-                            map,
-                            title: "Could not get your location",
-                          });
-                        }
-                      );
-                    });
-                  }, [order.customerAddress]);
                   return (
                     <Card key={order.id} className="mb-4">
                       <CardContent className="p-4">
@@ -1003,6 +1059,35 @@ export default function SellerDashboard() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Customers Tab */}
+          <TabsContent value="customers" className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h2 className="text-xl sm:text-2xl font-bold">Customer Registration</h2>
+              <p className="text-sm text-gray-600">Help customers create accounts for your store</p>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Register New Customer</CardTitle>
+                <CardDescription>
+                  Create a customer account for someone who wants to shop from your store. 
+                  This will redirect them to the customer dashboard after successful registration.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="py-6">
+                <CustomerSignupForm 
+                  onSuccess={() => {
+                    // Show success message
+                    toast({ 
+                      title: "Customer registered successfully!", 
+                      description: "The customer has been redirected to their dashboard." 
+                    });
+                  }}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Settings Tab */}

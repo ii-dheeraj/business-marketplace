@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Package, MapPin, Clock, DollarSign, Navigation, Phone, CheckCircle } from "lucide-react"
+import { Package, MapPin, Clock, DollarSign, Navigation, Phone, CheckCircle, Users } from "lucide-react"
 import { getCookie } from "@/lib/utils"
+import CustomerSignupForm from "@/components/CustomerSignupForm"
 
 // Mock data
 const stats = {
@@ -17,6 +19,7 @@ const stats = {
 }
 
 export default function DeliveryDashboard() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState("available")
   const [availableOrders, setAvailableOrders] = useState<any[]>([])
   const [activeDeliveries, setActiveDeliveries] = useState<any[]>([])
@@ -33,51 +36,102 @@ export default function DeliveryDashboard() {
   const [locationStatus, setLocationStatus] = useState("");
 
   useEffect(() => {
-    // Get delivery agent name and id from userInfo cookie
-    const userInfoCookie = getCookie("userInfo")
-    let deliveryAgentId = null
-    if (userInfoCookie) {
+    const checkAuth = () => {
+      // Get delivery agent name and id from userInfo cookie
+      const userInfoCookie = getCookie("userInfo")
+      const userTypeCookie = getCookie("userType")
+      
+      console.log("[DEBUG] Delivery Auth check - userInfo:", userInfoCookie ? "exists" : "missing")
+      console.log("[DEBUG] Delivery Auth check - userType:", userTypeCookie)
+      console.log("[DEBUG] Raw userInfo cookie value:", userInfoCookie)
+      console.log("[DEBUG] userInfo cookie length:", userInfoCookie?.length)
+      console.log("[DEBUG] userInfo cookie type:", typeof userInfoCookie)
+
+      // Check if user is authenticated and is a delivery agent
+      if (!userInfoCookie || userTypeCookie !== "DELIVERY_AGENT") {
+        console.log("[DEBUG] Missing delivery auth - userInfo:", !!userInfoCookie, "userType:", userTypeCookie)
+        setLoading(false)
+        if (userTypeCookie && userTypeCookie !== "DELIVERY_AGENT") {
+          // User is logged in but not a delivery agent
+          router.push("/")
+        } else {
+          // User is not logged in
+          router.push("/auth/login")
+        }
+        return
+      }
+
+      let deliveryAgentId = null
       try {
-        const user = JSON.parse(userInfoCookie)
+        console.log("[DEBUG] Attempting to parse userInfo cookie...")
+        
+        // Try to decode the cookie if it's URL encoded
+        let decodedCookie = userInfoCookie
+        try {
+          decodedCookie = decodeURIComponent(userInfoCookie)
+          console.log("[DEBUG] Decoded cookie:", decodedCookie)
+        } catch (decodeError) {
+          console.log("[DEBUG] Cookie is not URL encoded, using as-is")
+        }
+        
+        const user = JSON.parse(decodedCookie)
+        console.log("[DEBUG] Parsed user object:", user)
+        console.log("[DEBUG] Setting delivery agent info:", user)
         setAgentName(user.name || "")
         setAgentId(user.id)
         deliveryAgentId = user.id
-      } catch {}
-    }
-    // Fetch orders and stats
-    const fetchOrders = async () => {
-      setLoading(true)
-      setError("")
-      try {
-        const url = deliveryAgentId ? `/api/delivery/orders?deliveryAgentId=${deliveryAgentId}` : "/api/delivery/orders"
-        const res = await fetch(url)
-        const data = await res.json()
-        if (res.ok) {
-          setAvailableOrders(data.availableOrders || [])
-          setActiveDeliveries(data.activeDeliveries || [])
-          setStats(data.stats || { totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
-        } else {
-          setError(data.error || "Failed to fetch orders")
-        }
-      } catch (err) {
-        setError("Failed to fetch orders")
-      } finally {
+      } catch (error) {
+        console.log("[DEBUG] Failed to parse userInfo cookie:", error)
+        console.log("[DEBUG] Cookie value that failed to parse:", userInfoCookie)
+        console.log("[DEBUG] Cookie value (stringified):", JSON.stringify(userInfoCookie))
+        
+        // Try to fix the cookie by clearing it and redirecting to login
+        console.log("[DEBUG] Clearing corrupted cookie and redirecting to login")
         setLoading(false)
+        router.push("/auth/login")
+        return
       }
-    }
-    const fetchHistory = async () => {
-      if (!deliveryAgentId) return
-      try {
-        const res = await fetch(`/api/order/place?deliveryAgentId=${deliveryAgentId}&status=DELIVERED`)
-        const data = await res.json()
-        if (res.ok && data.orders) {
-          setDeliveryHistory(data.orders)
+      
+      // Fetch orders and stats
+      const fetchOrders = async () => {
+        setLoading(true)
+        setError("")
+        try {
+          const url = deliveryAgentId ? `/api/delivery/orders?deliveryAgentId=${deliveryAgentId}` : "/api/delivery/orders"
+          const res = await fetch(url)
+          const data = await res.json()
+          if (res.ok) {
+            setAvailableOrders(data.availableOrders || [])
+            setActiveDeliveries(data.activeDeliveries || [])
+            setStats(data.stats || { totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
+          } else {
+            setError(data.error || "Failed to fetch orders")
+          }
+        } catch (err) {
+          setError("Failed to fetch orders")
+        } finally {
+          setLoading(false)
         }
-      } catch {}
+      }
+      const fetchHistory = async () => {
+        if (!deliveryAgentId) return
+        try {
+          const res = await fetch(`/api/order/place?deliveryAgentId=${deliveryAgentId}&status=DELIVERED`)
+          const data = await res.json()
+          if (res.ok && data.orders) {
+            setDeliveryHistory(data.orders)
+          }
+        } catch (err) {
+          // ignore
+        }
+      }
+      fetchOrders()
+      fetchHistory()
     }
-    fetchOrders()
-    fetchHistory()
-  }, [])
+    
+    // Add a small delay to ensure cookies are set after registration
+    setTimeout(checkAuth, 500)
+  }, [router])
 
   const refreshOrders = async () => {
     if (!agentId) return
@@ -242,10 +296,11 @@ export default function DeliveryDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="available">Available Orders</TabsTrigger>
             <TabsTrigger value="active">Active Deliveries</TabsTrigger>
             <TabsTrigger value="history">Delivery History</TabsTrigger>
+            <TabsTrigger value="customers">Customers</TabsTrigger>
           </TabsList>
 
           <TabsContent value="available" className="space-y-6">
@@ -456,6 +511,31 @@ export default function DeliveryDashboard() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="customers" className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h2 className="text-2xl font-bold">Customer Registration</h2>
+              <p className="text-sm text-gray-600">Help customers create accounts for delivery services</p>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Register New Customer</CardTitle>
+                <CardDescription>
+                  Create a customer account for someone who wants to use delivery services. 
+                  This will redirect them to the customer dashboard after successful registration.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="py-6">
+                <CustomerSignupForm 
+                  onSuccess={() => {
+                    // Show success message
+                    alert("Customer registered successfully! The customer has been redirected to their dashboard.");
+                  }}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
