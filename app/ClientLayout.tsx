@@ -4,6 +4,7 @@ import type React from "react"
 import { useEffect } from "react"
 import { ChatWidget } from "@/components/chat-widget"
 import Header from "@/components/ui/header"
+import { Toaster } from "@/components/ui/toaster"
 
 interface Props {
   children: React.ReactNode
@@ -19,6 +20,7 @@ export default function ClientLayout({ children }: Props) {
       <Header />
       {children}
       <ChatWidget />
+      <Toaster />
     </>
   )
 }

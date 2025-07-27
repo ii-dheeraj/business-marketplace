@@ -38,7 +38,6 @@ import {
   Navigation,
   Users,
 } from "lucide-react"
-import CustomerSignupForm from "@/components/CustomerSignupForm"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -72,6 +71,7 @@ export default function SellerDashboard() {
 
   useEffect(() => {
     if (sellerInfo) {
+      console.log("[DEBUG] Setting profile form with seller info:", sellerInfo);
       setProfileForm({ ...sellerInfo });
     }
   }, [sellerInfo]);
@@ -81,14 +81,22 @@ export default function SellerDashboard() {
   };
 
   const handleSaveProfile = async () => {
+    if (!profileForm || !sellerInfo) {
+      toast({ title: "Error", description: "Profile data not available", variant: "destructive" });
+      return;
+    }
+    
     setIsSavingProfile(true);
     try {
+      console.log("[DEBUG] Saving profile with data:", profileForm);
       const res = await fetch("/api/seller/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profileForm),
+        body: JSON.stringify({ ...profileForm, id: sellerInfo.id }),
       });
       const data = await res.json();
+      console.log("[DEBUG] Profile save response:", data);
+      
       if (res.ok && data.seller) {
         setSellerInfo(data.seller);
         setProfileForm(data.seller);
@@ -97,6 +105,7 @@ export default function SellerDashboard() {
         toast({ title: "Failed to update profile", description: data.error || "Unknown error", variant: "destructive" });
       }
     } catch (error) {
+      console.error("[DEBUG] Profile save error:", error);
       toast({ title: "Failed to update profile", description: String(error), variant: "destructive" });
     } finally {
       setIsSavingProfile(false);
@@ -278,34 +287,46 @@ export default function SellerDashboard() {
 
     console.log("Saving product with data:", updateData) // Debug log
 
-    const res = await fetch("/api/product", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updateData),
-    })
-    const data = await res.json()
-    if (res.ok && data.product) {
-      console.log("Product updated successfully:", data.product) // Debug log
-      setProducts((prev) => prev.map((p) => (p.id === data.product.id ? data.product : p)))
-      setEditingProduct(null)
-      alert("Product updated successfully!")
-    } else {
-      console.error("Failed to update product:", data) // Debug log
-      alert(data.error || "Failed to update product")
+    try {
+      const res = await fetch("/api/product", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      })
+      const data = await res.json()
+      if (res.ok && data.product) {
+        console.log("Product updated successfully:", data.product) // Debug log
+        setProducts((prev) => prev.map((p) => (p.id === data.product.id ? data.product : p)))
+        setEditingProduct(null)
+        toast({ title: "Product updated successfully!" })
+      } else {
+        console.error("Failed to update product:", data) // Debug log
+        toast({ title: "Failed to update product", description: data.error || "Unknown error", variant: "destructive" })
+      }
+    } catch (error) {
+      console.error("Error updating product:", error)
+      toast({ title: "Failed to update product", description: String(error), variant: "destructive" })
     }
   }
   const handleDeleteProduct = async (productId: number) => {
     if (!window.confirm("Are you sure you want to delete this product?")) return
-    const res = await fetch("/api/product", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: productId }),
-    })
-    if (res.ok) {
-      setProducts((prev) => prev.filter((p) => p.id !== productId))
-    } else {
-      const data = await res.json()
-      alert(data.error || "Failed to delete product")
+    
+    try {
+      const res = await fetch("/api/product", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: productId }),
+      })
+      if (res.ok) {
+        setProducts((prev) => prev.filter((p) => p.id !== productId))
+        toast({ title: "Product deleted successfully!" })
+      } else {
+        const data = await res.json()
+        toast({ title: "Failed to delete product", description: data.error || "Unknown error", variant: "destructive" })
+      }
+    } catch (error) {
+      console.error("Error deleting product:", error)
+      toast({ title: "Failed to delete product", description: String(error), variant: "destructive" })
     }
   }
 
@@ -434,7 +455,7 @@ export default function SellerDashboard() {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="products" className="text-xs sm:text-sm">
               <Package className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Products</span>
@@ -454,11 +475,6 @@ export default function SellerDashboard() {
               <Store className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Profile</span>
               <span className="sm:hidden">Profile</span>
-            </TabsTrigger>
-            <TabsTrigger value="customers" className="text-xs sm:text-sm">
-              <Users className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Customers</span>
-              <span className="sm:hidden">Customers</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="text-xs sm:text-sm">
               <Settings className="h-4 w-4 mr-1 sm:mr-2" />
@@ -922,46 +938,22 @@ export default function SellerDashboard() {
                         <img src={profileForm.businessImage} alt="Business" className="mt-2 rounded w-32 h-32 object-cover" />
                       )}
                     </div>
-                    <div>
-                      <Label htmlFor="profile-openingHours">Opening Hours</Label>
-                      <Input id="profile-openingHours" value={profileForm.openingHours || ""} onChange={e => handleProfileInputChange("openingHours", e.target.value)} placeholder="e.g. 9:00 AM - 9:00 PM" />
-                    </div>
+                                         <div>
+                       <Label htmlFor="profile-openingHours">Opening Hours</Label>
+                       <Input id="profile-openingHours" value={profileForm.openingHours || ""} onChange={e => handleProfileInputChange("openingHours", e.target.value)} placeholder="e.g. 9:00 AM - 9:00 PM" />
+                     </div>
                   </div>
                   <div className="flex gap-2 justify-end mt-4">
-                    <Button onClick={handleSaveProfile} disabled={isSavingProfile}>{isSavingProfile ? "Saving..." : "Save Changes"}</Button>
+                    <Button 
+                      onClick={handleSaveProfile} 
+                      disabled={isSavingProfile || !profileForm}
+                    >
+                      {isSavingProfile ? "Saving..." : "Save Changes"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          {/* Customers Tab */}
-          <TabsContent value="customers" className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <h2 className="text-xl sm:text-2xl font-bold">Customer Registration</h2>
-              <p className="text-sm text-gray-600">Help customers create accounts for your store</p>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Register New Customer</CardTitle>
-                <CardDescription>
-                  Create a customer account for someone who wants to shop from your store. 
-                  This will redirect them to the customer dashboard after successful registration.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="py-6">
-                <CustomerSignupForm 
-                  onSuccess={() => {
-                    // Show success message
-                    toast({ 
-                      title: "Customer registered successfully!", 
-                      description: "The customer has been redirected to their dashboard." 
-                    });
-                  }}
-                />
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Settings Tab */}

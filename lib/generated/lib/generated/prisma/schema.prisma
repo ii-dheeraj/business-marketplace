@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -80,10 +80,14 @@ model Seller {
   subcategories       String // JSON array of subcategories (multiple selection)
   businessAddress     String
   businessCity        String
+  businessState       String? // Added missing field
+  businessPincode     String? // Added missing field
   businessArea        String?
   businessLocality    String?
   businessDescription String?
   businessImage       String?
+  website             String? // Added missing field
+  openingHours        String? // Added missing field
   isVerified          Boolean @default(false)
   isPromoted          Boolean @default(false)
   rating              Float   @default(0)

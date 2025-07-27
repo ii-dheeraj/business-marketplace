@@ -30,9 +30,9 @@ export default function DeliveryDashboard() {
   const [stats, setStats] = useState<any>({ totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
 
   useEffect(() => {
-    // Get delivery agent name and id from userInfo cookie
-    const userInfoCookie = getCookie("userInfo")
-    let deliveryAgentId = null
+      // Get delivery agent name and id from userInfo cookie
+      const userInfoCookie = getCookie("userInfo")
+      let deliveryAgentId = null
     if (userInfoCookie) {
       try {
         const user = JSON.parse(userInfoCookie)
@@ -41,39 +41,39 @@ export default function DeliveryDashboard() {
         deliveryAgentId = user.id
       } catch {}
     }
-    // Fetch orders and stats
-    const fetchOrders = async () => {
-      setLoading(true)
-      setError("")
-      try {
-        const url = deliveryAgentId ? `/api/delivery/orders?deliveryAgentId=${deliveryAgentId}` : "/api/delivery/orders"
-        const res = await fetch(url)
-        const data = await res.json()
-        if (res.ok) {
-          setAvailableOrders(data.availableOrders || [])
-          setActiveDeliveries(data.activeDeliveries || [])
-          setStats(data.stats || { totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
-        } else {
-          setError(data.error || "Failed to fetch orders")
+      // Fetch orders and stats
+      const fetchOrders = async () => {
+        setLoading(true)
+        setError("")
+        try {
+          const url = deliveryAgentId ? `/api/delivery/orders?deliveryAgentId=${deliveryAgentId}` : "/api/delivery/orders"
+          const res = await fetch(url)
+          const data = await res.json()
+          if (res.ok) {
+            setAvailableOrders(data.availableOrders || [])
+            setActiveDeliveries(data.activeDeliveries || [])
+            setStats(data.stats || { totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
+          } else {
+            setError(data.error || "Failed to fetch orders")
+          }
+        } catch (err) {
+          setError("Failed to fetch orders")
+        } finally {
+          setLoading(false)
         }
-      } catch (err) {
-        setError("Failed to fetch orders")
-      } finally {
-        setLoading(false)
       }
-    }
-    const fetchHistory = async () => {
-      if (!deliveryAgentId) return
-      try {
-        const res = await fetch(`/api/order/place?deliveryAgentId=${deliveryAgentId}&status=DELIVERED`)
-        const data = await res.json()
-        if (res.ok && data.orders) {
-          setDeliveryHistory(data.orders)
-        }
+      const fetchHistory = async () => {
+        if (!deliveryAgentId) return
+        try {
+          const res = await fetch(`/api/order/place?deliveryAgentId=${deliveryAgentId}&status=DELIVERED`)
+          const data = await res.json()
+          if (res.ok && data.orders) {
+            setDeliveryHistory(data.orders)
+          }
       } catch {}
-    }
-    fetchOrders()
-    fetchHistory()
+      }
+      fetchOrders()
+      fetchHistory()
   }, [])
 
   const refreshOrders = async () => {
@@ -96,8 +96,8 @@ export default function DeliveryDashboard() {
     } finally {
       setLoading(false)
     }
-  }
-
+      }
+    
   const handleAcceptOrder = async (orderId: string) => {
     if (!agentId) return
     try {
@@ -293,7 +293,7 @@ export default function DeliveryDashboard() {
                         <span>Items: {order.items}</span>
                         <span>Distance: {order.distance}</span>
                         <span>Est. Time: {order.estimatedTime}</span>
-                      </div>
+                        </div>
 
                       <div className="flex gap-2">
                         <Button onClick={() => handleAcceptOrder(order.id)} className="flex-1">
@@ -423,7 +423,7 @@ export default function DeliveryDashboard() {
                           Pickup Parcel
                         </Button>
                         <p className="text-xs text-gray-500 text-center">Click to confirm parcel pickup from seller</p>
-                      </div>
+                        </div>
 
                       <div className="flex gap-2 mt-4">
                         <Button variant="outline" onClick={() => handleViewRoute(delivery.pickup, delivery.delivery)}>
@@ -467,7 +467,7 @@ export default function DeliveryDashboard() {
                           <p className="text-gray-600">{delivery.seller}</p>
                           <Badge variant="default" className="mt-1">
                             {delivery.status === "picked_up" ? "Picked Up" : "In Transit"}
-                          </Badge>
+                        </Badge>
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold text-green-600">₹{delivery.deliveryFee}</p>
@@ -489,7 +489,7 @@ export default function DeliveryDashboard() {
                         <span>ETA: {delivery.estimatedTime}</span>
                       </div>
 
-                      <div className="flex gap-2">
+                        <div className="flex gap-2">
                         <Button onClick={() => handleCompleteDelivery(delivery.id)} className="flex-1">
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Complete Delivery
@@ -501,7 +501,7 @@ export default function DeliveryDashboard() {
                         <Button variant="outline" onClick={() => handleCallCustomer(delivery.customerPhone)}>
                           <Phone className="h-4 w-4 mr-2" />
                           Call Customer
-                        </Button>
+                          </Button>
                       </div>
                     </CardContent>
                   </Card>
