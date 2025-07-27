@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { InputOTP } from "@/components/ui/input-otp";
 import { useRouter } from "next/navigation";
 import { setCookie } from "@/lib/utils";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 export default function CustomerSignupForm({ onSuccess }: { onSuccess?: () => void }) {
   const [form, setForm] = useState({
@@ -152,11 +153,10 @@ export default function CustomerSignupForm({ onSuccess }: { onSuccess?: () => vo
       
       <div className="space-y-2">
         <Label htmlFor="customer-phone">Phone Number <span className="text-red-500">*</span></Label>
-        <Input
+        <PhoneInput
           id="customer-phone"
-          type="tel"
           value={form.phone}
-          onChange={(e) => handleChange("phone", e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
+          onChange={(e) => handleChange("phone", e.target.value)}
           placeholder="Enter your phone number"
           maxLength={10}
           required

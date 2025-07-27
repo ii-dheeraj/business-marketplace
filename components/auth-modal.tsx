@@ -5,6 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -21,17 +22,22 @@ interface AuthModalProps {
   isOpen: boolean
   onClose: () => void
   defaultMode?: "login" | "register"
+  defaultUserType?: "CUSTOMER" | "SELLER" | "DELIVERY_AGENT"
 }
 
-export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalProps) {
+export function AuthModal({ isOpen, onClose, defaultMode = "login", defaultUserType }: AuthModalProps) {
   const [mode, setMode] = useState<"login" | "register">(defaultMode)
-  const [userType, setUserType] = useState<"CUSTOMER" | "SELLER" | "DELIVERY_AGENT" | null>(null)
+  const [userType, setUserType] = useState<"CUSTOMER" | "SELLER" | "DELIVERY_AGENT" | null>(defaultUserType || null)
   const [showPassword, setShowPassword] = useState(false)
-  const [formData, setFormData] = useState({
+  const [loginFormData, setLoginFormData] = useState({
+    phone: "",
+  })
+  const [registerFormData, setRegisterFormData] = useState({
     name: "",
     email: "",
     password: "",
     phone: "",
+    countryCode: "+91",
     businessName: "",
     category: "",
     subcategory: "",
@@ -57,12 +63,22 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
     setMode(defaultMode)
   }, [defaultMode])
 
+  useEffect(() => {
+    if (defaultUserType) {
+      setUserType(defaultUserType)
+    }
+  }, [defaultUserType])
+
   const resetForm = () => {
-    setFormData({
+    setLoginFormData({
+      phone: "",
+    })
+    setRegisterFormData({
       name: "",
       email: "",
       password: "",
       phone: "",
+      countryCode: "+91",
       businessName: "",
       category: "",
       subcategory: "",
@@ -102,9 +118,16 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
     setSuccessMsg("")
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
+  const handleLoginInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLoginFormData({
+      ...loginFormData,
+      [e.target.name]: e.target.value,
+    })
+  }
+
+  const handleRegisterInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRegisterFormData({
+      ...registerFormData,
       [e.target.name]: e.target.value,
     })
   }
@@ -112,7 +135,8 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   console.log("[DEBUG] Form submitted, mode:", mode, "userType:", userType);
-  console.log("[DEBUG] Form data:", formData);
+  console.log("[DEBUG] Login form data:", loginFormData);
+  console.log("[DEBUG] Register form data:", registerFormData);
   setIsLoading(true);
   setErrorMsg("");
   setSuccessMsg("");
@@ -125,7 +149,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
       }
       if (!otpStep) {
         // Step 1: Request OTP
-        if (!formData.phone) {
+        if (!loginFormData.phone) {
           setErrorMsg("Please enter your phone number.");
           setIsLoading(false);
           return;
@@ -134,11 +158,11 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
           const res = await fetch("/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              phone: formData.phone,
-              userType,
-              step: "request_otp",
-            }),
+                         body: JSON.stringify({
+               phone: loginFormData.phone,
+               userType,
+               step: "request_otp",
+             }),
           });
           const data = await res.json();
           if (!res.ok) {
@@ -151,7 +175,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
             return;
           }
           setOtpStep("otp-requested");
-          setOtpPhone(data.phone || formData.phone);
+          setOtpPhone(data.phone || loginFormData.phone);
           setSuccessMsg("OTP sent! Please check your phone (or console in dev mode).");
         } catch (error: any) {
           setErrorMsg(error.message || "Failed to send OTP");
@@ -214,7 +238,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
         // Call register API
         if (!otpStep) {
           // Step 1: Request OTP
-          if (!formData.name || !formData.email || !formData.phone || !userType) {
+          if (!registerFormData.name || !registerFormData.email || !registerFormData.phone || !userType) {
             setErrorMsg("Please fill all required fields.");
             setIsLoading(false);
             return;
@@ -224,7 +248,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                ...formData,
+                ...registerFormData,
                 userType,
                 step: "request_otp",
               }),
@@ -236,7 +260,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
               return;
             }
             setOtpStep("otp-requested");
-            setOtpPhone(formData.phone);
+            setOtpPhone(registerFormData.phone);
             setSuccessMsg("OTP sent! Please check your phone (or console in dev mode).");
           } catch (error: any) {
             setErrorMsg(error.message || "Failed to send OTP");
@@ -408,16 +432,15 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                 <form onSubmit={handleSubmit}>
                   {!otpStep ? (
                     <>
-                      <Input
-                        name="phone"
-                        type="tel"
-                        placeholder="Enter your phone number"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        className="mb-2"
-                        required
-                        maxLength={15}
-                      />
+                                             <PhoneInput
+                         name="phone"
+                         placeholder="Enter your phone number"
+                         value={loginFormData.phone}
+                         onChange={handleLoginInputChange}
+                         className="mb-2"
+                         required
+                         maxLength={10}
+                       />
                       <Button type="submit" disabled={isLoading} className="w-full mt-2">
                         {isLoading ? "Sending OTP..." : "Send OTP"}
                       </Button>
@@ -474,40 +497,39 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login" }: AuthModalP
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">Full Name</label>
-                      <Input
-                        name="name"
-                        type="text"
-                        placeholder="Enter your full name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        className="h-12 text-base"
-                        required
-                      />
+                                             <Input
+                         name="name"
+                         type="text"
+                         placeholder="Enter your full name"
+                         value={registerFormData.name}
+                         onChange={handleRegisterInputChange}
+                         className="h-12 text-base"
+                         required
+                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">Email</label>
-                      <Input
-                        name="email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="h-12 text-base"
-                        required
-                      />
+                                             <Input
+                         name="email"
+                         type="email"
+                         placeholder="Enter your email"
+                         value={registerFormData.email}
+                         onChange={handleRegisterInputChange}
+                         className="h-12 text-base"
+                         required
+                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">Phone Number</label>
-                      <Input
-                        name="phone"
-                        type="tel"
-                        placeholder="Enter your phone number"
-                        value={formData.phone}
-                        onChange={e => handleInputChange({ target: { name: "phone", value: e.target.value.replace(/[^0-9]/g, "").slice(0, 10) } } as any)}
-                        className="h-12 text-base"
-                        required
-                        maxLength={10}
-                      />
+                                             <PhoneInput
+                         name="phone"
+                         placeholder="Enter your phone number"
+                         value={registerFormData.phone}
+                         onChange={e => handleRegisterInputChange({ target: { name: "phone", value: e.target.value } } as any)}
+                         className="h-12 text-base"
+                         required
+                         maxLength={10}
+                       />
                     </div>
                     {/* OTP Step */}
                     {otpStep === "otp-requested" ? (

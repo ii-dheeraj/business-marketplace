@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { InputOTP } from "@/components/ui/input-otp";
 import { useRouter } from "next/navigation";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 export default function DeliveryAgentSignupForm({ onSuccess }: { onSuccess?: () => void }) {
   const [form, setForm] = useState({
     name: "",
     email: "",
     phone: "",
+    countryCode: "+91",
     vehicleNumber: "",
     vehicleType: "",
   });
@@ -46,6 +48,7 @@ export default function DeliveryAgentSignupForm({ onSuccess }: { onSuccess?: () 
           name: form.name.trim(),
           email: form.email.trim(),
           phone: form.phone.trim(),
+          countryCode: form.countryCode,
           vehicleNumber: form.vehicleNumber.trim(),
           vehicleType: form.vehicleType.trim(),
           userType: "DELIVERY_AGENT",
@@ -141,7 +144,7 @@ export default function DeliveryAgentSignupForm({ onSuccess }: { onSuccess?: () 
       </div>
       <div>
         <Label htmlFor="phone">Phone Number <span className="text-red-500">*</span></Label>
-        <Input id="phone" value={form.phone} onChange={e => handleChange("phone", e.target.value.replace(/[^0-9]/g, "").slice(0, 10))} required maxLength={10} placeholder="10-digit phone number" />
+        <PhoneInput id="phone" value={form.phone} onChange={e => handleChange("phone", e.target.value)} required maxLength={10} placeholder="10-digit phone number" />
       </div>
       <div>
         <Label htmlFor="vehicleNumber">Vehicle Number <span className="text-red-500">*</span></Label>

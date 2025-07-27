@@ -8,7 +8,6 @@ import { Loader2, Package, ArrowLeft, Bell, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getCookie } from "@/lib/utils"
-import OrderTracking from "@/components/order-tracking"
 import { useToast } from "@/hooks/use-toast"
 
 // Extend Window interface for eventSource
@@ -34,7 +33,15 @@ export default function CustomerOrderHistory() {
     }
     const user = JSON.parse(userInfoCookie)
     fetchOrders(user.id)
-    setupRealTimeConnection(user.id)
+    
+    // Try to set up real-time connection, but don't fail if it doesn't work
+    try {
+      setupRealTimeConnection(user.id)
+    } catch (error) {
+      console.warn("Real-time connection failed, continuing without it:", error)
+      setRealTimeConnected(false)
+    }
+    
     return () => {
       // Cleanup real-time connection
       if (typeof window !== 'undefined' && window.eventSource) {
@@ -81,58 +88,77 @@ export default function CustomerOrderHistory() {
       }
 
       eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        
-        if (data.type === 'order_update') {
-          // Update orders list with new data
-          setOrders(prevOrders => {
-            const updatedOrders = prevOrders.map(order => 
-              order.id === data.orderId ? { ...order, ...data.updates } : order
-            )
-            return updatedOrders
-          })
+        try {
+          const data = JSON.parse(event.data)
+          
+          // Handle heartbeat messages
+          if (data.type === 'heartbeat') {
+            return
+          }
+          
+          // Handle connection confirmation
+          if (data.type === 'connected') {
+            console.log("✅ Real-time connection confirmed:", data.message)
+            return
+          }
+          
+          if (data.type === 'order_update') {
+            // Update orders list with new data
+            setOrders(prevOrders => {
+              const updatedOrders = prevOrders.map(order => 
+                order.id === data.orderId ? { ...order, ...data.updates } : order
+              )
+              return updatedOrders
+            })
 
-          // Show notification
-          toast({
-            title: "Order Update",
-            description: `Order #${data.orderId} status: ${data.status}`,
-          })
-        }
-
-        if (data.type === 'order_status_change') {
-          // Refresh orders to get latest status
-          const userInfoCookie = getCookie("userInfo")
-          if (userInfoCookie) {
-            const user = JSON.parse(userInfoCookie)
-            fetchOrders(user.id)
+            // Show notification
+            toast({
+              title: "Order Update",
+              description: `Order #${data.orderId} status: ${data.status}`,
+            })
           }
 
-          toast({
-            title: "Order Status Changed",
-            description: `Your order #${data.orderId} is now ${data.newStatus}`,
-          })
-        }
+          if (data.type === 'order_status_change') {
+            // Refresh orders to get latest status
+            const userInfoCookie = getCookie("userInfo")
+            if (userInfoCookie) {
+              const user = JSON.parse(userInfoCookie)
+              fetchOrders(user.id)
+            }
 
-        if (data.type === 'delivery_update') {
-          toast({
-            title: "Delivery Update",
-            description: data.message,
-          })
+            toast({
+              title: "Order Status Changed",
+              description: `Your order #${data.orderId} is now ${data.newStatus}`,
+            })
+          }
+
+          if (data.type === 'delivery_update') {
+            toast({
+              title: "Delivery Update",
+              description: data.message,
+            })
+          }
+        } catch (parseError) {
+          console.error("Error parsing real-time message:", parseError, "Raw data:", event.data)
         }
       }
 
       eventSource.onerror = (error) => {
         console.error("Real-time connection error:", error)
+        console.error("EventSource readyState:", eventSource.readyState)
         setRealTimeConnected(false)
         
-        // Attempt to reconnect after 5 seconds
-        setTimeout(() => {
-          const userInfoCookie = getCookie("userInfo")
-          if (userInfoCookie) {
-            const user = JSON.parse(userInfoCookie)
-            setupRealTimeConnection(user.id)
-          }
-        }, 5000)
+        // Only attempt to reconnect if the connection was actually closed
+        if (eventSource.readyState === EventSource.CLOSED) {
+          console.log("🔄 Attempting to reconnect in 5 seconds...")
+          setTimeout(() => {
+            const userInfoCookie = getCookie("userInfo")
+            if (userInfoCookie) {
+              const user = JSON.parse(userInfoCookie)
+              setupRealTimeConnection(user.id)
+            }
+          }, 5000)
+        }
       }
 
     } catch (error) {
@@ -214,6 +240,16 @@ export default function CustomerOrderHistory() {
             </span>
           </div>
         )}
+        
+        {/* Fallback message if real-time is not available */}
+        {!realTimeConnected && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
+            <Bell className="h-4 w-4 text-blue-600" />
+            <span className="text-blue-800 text-sm">
+              Real-time updates are not available. Use the refresh button to check for updates.
+            </span>
+          </div>
+        )}
 
         {orders.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
@@ -228,59 +264,70 @@ export default function CustomerOrderHistory() {
           <div className="space-y-6">
             {orders.map((order) => (
               <Card key={order.id} className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      Order #{order.id}
-                      <Badge className={getStatusBadgeColor(order.orderStatus)}>
-                        {order.orderStatus.replace(/_/g, ' ')}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {new Date(order.createdAt).toLocaleDateString()}
-                    </div>
-                  </CardTitle>
-                </CardHeader>
+                                 <CardHeader>
+                   <CardTitle className="flex items-center justify-between">
+                     <div className="flex items-center gap-2">
+                       Order #{order.id}
+                       <Badge className={getStatusBadgeColor(order.orderStatus)}>
+                         {order.orderStatus.replace(/_/g, ' ')}
+                       </Badge>
+                     </div>
+                     <div className="text-sm text-gray-500">
+                       {new Date(order.createdAt || order.created_at).toLocaleDateString()}
+                     </div>
+                   </CardTitle>
+                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                     <span>Total: <span className="font-semibold text-green-700">₹{order.totalAmount}</span></span>
-                    <span>Placed: {new Date(order.createdAt).toLocaleString()}</span>
+                    <span>Placed: {new Date(order.createdAt || order.created_at).toLocaleString()}</span>
                     <span>Payment: {order.paymentMethod}</span>
                     {order.estimatedDeliveryTime && (
                       <span>Est. Delivery: {new Date(order.estimatedDeliveryTime).toLocaleString()}</span>
                     )}
                   </div>
                   
-                  <div className="mt-2">
-                    <span className="font-medium">Items:</span>
-                    <ul className="list-disc ml-6 mt-1">
-                      {(order.order_items || []).map((item: any) => (
-                        <li key={item.id}>
-                          {item.productName} x {item.quantity} (₹{item.totalPrice})
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  
-                  <div className="pt-2 border-t">
-                    <OrderTracking
-                      orderId={order.id}
-                      orderNumber={order.orderNumber}
-                      orderStatus={order.orderStatus}
-                      totalAmount={order.totalAmount}
-                      customerName={order.customerName}
-                      customerPhone={order.customerPhone}
-                      customerAddress={order.customerAddress}
-                      createdAt={order.createdAt}
-                      estimatedDeliveryTime={order.estimatedDeliveryTime}
-                      actualDeliveryTime={order.actualDeliveryTime}
-                      deliveryInstructions={order.deliveryInstructions}
-                      items={order.order_items || []}
-                      sellerOrders={order.sellerOrders || []}
-                      deliveryAgent={order.deliveryAgent}
-                    />
-                  </div>
-                </CardContent>
+                                     <div className="mt-2">
+                     <span className="font-medium">Items:</span>
+                     <ul className="list-disc ml-6 mt-1">
+                       {(order.order_items || []).map((item: any) => (
+                         <li key={item.id}>
+                           {item.productName} x {item.quantity} (₹{item.totalPrice})
+                         </li>
+                       ))}
+                     </ul>
+                   </div>
+                   
+                   {/* Delivery OTP - Show if order is not delivered */}
+                   {order.parcel_otp && order.orderStatus !== 'DELIVERED' && (
+                     <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                       <div className="text-center">
+                         <p className="text-sm text-blue-700 mb-2">Share this OTP with the delivery agent when they arrive</p>
+                         <div className="bg-white p-3 rounded-lg border-2 border-blue-300 inline-block">
+                           <span className="text-2xl font-bold text-blue-600 tracking-wider font-mono">
+                             {order.parcel_otp}
+                           </span>
+                         </div>
+                         <p className="text-xs text-blue-600 mt-2">This OTP is valid until delivery is completed</p>
+                       </div>
+                     </div>
+                   )}
+                   
+                   {/* Delivery Address */}
+                   <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                     <h4 className="font-medium text-gray-800 mb-2">Delivery Address:</h4>
+                     <p className="text-sm text-gray-600">{order.customerAddress}</p>
+                     <p className="text-sm text-gray-600 mt-1">Phone: {order.customerPhone}</p>
+                     {order.deliveryInstructions && (
+                       <div className="mt-2 p-2 bg-blue-50 rounded">
+                         <p className="text-xs text-blue-800">
+                           <strong>Instructions:</strong> {order.deliveryInstructions}
+                         </p>
+                       </div>
+                     )}
+                   </div>
+                   
+                 </CardContent>
               </Card>
             ))}
           </div>

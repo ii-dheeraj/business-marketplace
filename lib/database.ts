@@ -10,6 +10,7 @@ export const createCustomer = async (data: {
   email: string
   password: string
   phone?: string
+  countryCode?: string
 }) => {
   const { data: customer, error } = await supabase
     .from('customers')
@@ -56,6 +57,7 @@ export const createSeller = async (data: {
   email: string
   password: string
   phone?: string
+  countryCode?: string
   businessName: string
   category: string
   subcategories: string
@@ -114,6 +116,7 @@ export const createDeliveryAgent = async (data: {
   email: string
   password: string
   phone?: string
+  countryCode?: string
   vehicleNumber: string
   vehicleType: string
 }) => {
@@ -233,6 +236,7 @@ export const createOrder = async (data: {
   totalAmount: number
   paymentMethod: string
   deliveryInstructions?: string
+  deliveryOTP?: string
   items: any[]
 }) => {
   // Step 1: Create order without orderNumber
@@ -253,6 +257,7 @@ export const createOrder = async (data: {
       totalAmount: data.totalAmount,
       paymentMethod: data.paymentMethod,
       deliveryInstructions: data.deliveryInstructions,
+      parcel_otp: data.deliveryOTP, // Store the delivery OTP
       orderStatus: 'CONFIRMED',
     }])
     .select()
@@ -332,30 +337,7 @@ export const createPayment = async (data: {
   return payment
 }
 
-// OTP generation utility
-export function generateParcelOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
-}
 
-// Store OTP for an order
-export const setOrderParcelOTP = async (orderId: number, otp: string) => {
-  const { error } = await supabase
-    .from('orders')
-    .update({ parcel_otp: otp })
-    .eq('id', orderId)
-  if (error) throw error
-}
-
-// Validate OTP for an order
-export const validateOrderParcelOTP = async (orderId: number, otp: string) => {
-  const { data: order, error } = await supabase
-    .from('orders')
-    .select('parcel_otp')
-    .eq('id', orderId)
-    .single()
-  if (error) throw error
-  return order && order.parcel_otp === otp
-}
 
 // Update delivery agent GPS location for an order
 export const updateOrderDeliveryAgentLocation = async (orderId: number, location: any) => {

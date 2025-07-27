@@ -135,7 +135,8 @@ export async function POST(request: NextRequest) {
             name: regData.name,
             email: regData.email,
             password: '', // No password
-            phone: regData.phone
+            phone: regData.phone,
+            countryCode: regData.countryCode || '+91'
           });
           userTypeForResponse = 'CUSTOMER';
         } else if (regData.userType === 'SELLER') {
@@ -157,6 +158,7 @@ export async function POST(request: NextRequest) {
             email: regData.email,
             password: '',
             phone: regData.phone,
+            countryCode: regData.countryCode || '+91',
             businessName: regData.businessName,
             category: regData.category,
             subcategories: regData.subcategories ? JSON.stringify(regData.subcategories) : '[]',
@@ -180,6 +182,7 @@ export async function POST(request: NextRequest) {
             email: regData.email,
             password: '',
             phone: regData.phone,
+            countryCode: regData.countryCode || '+91',
             vehicleNumber: regData.vehicleNumber,
             vehicleType: regData.vehicleType
           });

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/database";
 import {
-  setOrderParcelOTP,
-  validateOrderParcelOTP,
-  updateOrderDeliveryAgentLocation
+  updateOrderDeliveryAgentLocation,
 } from "@/lib/database";
 
 export async function GET(request: NextRequest) {
@@ -72,27 +70,77 @@ export async function GET(request: NextRequest) {
       stats.rating = null;
     }
 
-    // Map orders to UI-friendly format
-    const mapOrder = (order: any) => ({
-      id: order.orderNumber || order.id,
-      seller: "-", // Optionally fetch seller info
-      customer: order.customerName,
-      pickup: order.customerAddress,
-      delivery: order.customerAddress,
-      amount: order.totalAmount,
-      deliveryFee: order.deliveryFee,
-      distance: "-", // Optionally calculate
-      estimatedTime: "-", // Optionally calculate
-      items: order.items?.length ? order.items.map((i: any) => i.productName).join(", ") : "-",
-      customerPhone: order.customerPhone,
-      status: order.orderStatus,
-      created_at: order.created_at,
-      updated_at: order.updated_at,
-    });
+    // Map orders to UI-friendly format with seller details
+    const mapOrder = async (order: any) => {
+      let sellerInfo: any = null;
+      let productDetails: any[] = [];
+
+      // Fetch seller information
+      try {
+        const { data: sellerOrders } = await supabase
+          .from("seller_orders")
+          .select(`
+            seller:sellers(id, name, phone, businessAddress, businessName)
+          `)
+          .eq("orderId", order.id)
+          .limit(1);
+        
+        if (sellerOrders && sellerOrders.length > 0) {
+          sellerInfo = sellerOrders[0].seller;
+        }
+      } catch (error) {
+        console.error("Error fetching seller info:", error);
+      }
+
+      // Fetch product details
+      try {
+        const { data: orderItems } = await supabase
+          .from("order_items")
+          .select(`
+            quantity,
+            product:products(name, description, price)
+          `)
+          .eq("orderId", order.id);
+        
+        if (orderItems) {
+          productDetails = orderItems.map((item: any) => ({
+            name: item.product?.name || "Unknown Product",
+            quantity: item.quantity,
+            price: item.product?.price || 0
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching product details:", error);
+      }
+
+      return {
+        id: order.orderNumber || order.id,
+        seller: sellerInfo?.businessName || sellerInfo?.name || "-",
+        sellerAddress: sellerInfo?.businessAddress || "-",
+        sellerPhone: sellerInfo?.phone || "-",
+        customer: order.customerName,
+        pickup: sellerInfo?.businessAddress || order.customerAddress,
+        delivery: order.customerAddress,
+        amount: order.totalAmount,
+        deliveryFee: order.deliveryFee,
+        distance: "-", // Optionally calculate
+        estimatedTime: "-", // Optionally calculate
+        items: productDetails.length > 0 ? productDetails.map((p: any) => `${p.name} (${p.quantity})`).join(", ") : "-",
+        productDetails: productDetails,
+        customerPhone: order.customerPhone,
+        status: order.orderStatus,
+        created_at: order.created_at,
+        updated_at: order.updated_at,
+      };
+    };
+
+    // Fetch orders with seller details
+    const availableOrdersWithDetails = await Promise.all(safeAvailableOrders.map(mapOrder));
+    const activeDeliveriesWithDetails = await Promise.all(activeDeliveries.map(mapOrder));
 
     return NextResponse.json({
-      availableOrders: safeAvailableOrders.map(mapOrder),
-      activeDeliveries: activeDeliveries.map(mapOrder),
+      availableOrders: availableOrdersWithDetails,
+      activeDeliveries: activeDeliveriesWithDetails,
       stats,
     });
   } catch (error) {
@@ -111,7 +159,7 @@ export async function PATCH(request: NextRequest) {
 
     let updateData: any = { deliveryAgentId: Number(deliveryAgentId) };
     if (action === "accept") {
-      updateData.orderStatus = "OUT_FOR_DELIVERY";
+      updateData.orderStatus = "READY_FOR_PICKUP";
     } else if (action === "picked_up") {
       updateData.orderStatus = "IN_TRANSIT";
     } else if (action === "delivered") {
@@ -137,24 +185,9 @@ export async function PATCH(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, orderId, otp, location, deliveryAgentId } = body;
+    const { action, orderId, location, deliveryAgentId } = body;
     if (!action || !orderId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-
-    if (action === "validate_otp") {
-      if (!otp) return NextResponse.json({ error: "Missing OTP" }, { status: 400 });
-      const valid = await validateOrderParcelOTP(Number(orderId), otp);
-      if (!valid) return NextResponse.json({ success: false, error: "Invalid OTP" }, { status: 401 });
-      // Mark as PICKED_UP and add tracking entry
-      await supabase.from("orders").update({ orderStatus: "IN_TRANSIT" }).eq("id", Number(orderId));
-      await supabase.from("order_tracking").insert({
-        orderId: Number(orderId),
-        status: "PICKED_UP",
-        description: "Parcel picked up by delivery agent.",
-        location: "Seller Location"
-      });
-      return NextResponse.json({ success: true });
     }
 
     if (action === "update_location") {

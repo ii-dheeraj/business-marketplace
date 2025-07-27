@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+
 import {
   Package,
   ShoppingCart,
@@ -44,32 +45,9 @@ import Image from "next/image"
 import { getCookie, deleteCookie } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast";
 import { indianStates, indianStateCityMap } from "@/utils/indian-location-data";
-import Script from "next/script";
 
-// Add this line to get the Google Maps API key from environment variables
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-// Remove mockProducts array and any references to it
 
-// Helper to load Google Maps JS API
-function loadGoogleMapsScript(apiKey: string, callback: () => void) {
-  if (typeof window === "undefined") return;
-  if ((window as any).google && (window as any).google.maps) {
-    callback();
-    return;
-  }
-  const existingScript = document.getElementById("google-maps-js");
-  if (existingScript) {
-    existingScript.addEventListener("load", callback);
-    return;
-  }
-  const script = document.createElement("script");
-  script.id = "google-maps-js";
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-  script.async = true;
-  script.onload = callback;
-  document.body.appendChild(script);
-}
 
 export default function SellerDashboard() {
   const [sellerInfo, setSellerInfo] = useState<any>(null)
@@ -88,8 +66,9 @@ export default function SellerDashboard() {
   const { toast } = useToast();
   const [profileForm, setProfileForm] = useState<any>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [trackingOrders, setTrackingOrders] = useState<any[]>([]);
-  const [mapsLoaded, setMapsLoaded] = useState(false);
+
+
+
 
   useEffect(() => {
     if (sellerInfo) {
@@ -161,19 +140,7 @@ export default function SellerDashboard() {
     }
   }
 
-  // Fetch tracking orders (OUT_FOR_DELIVERY or IN_TRANSIT)
-  const fetchTrackingOrders = async () => {
-    if (!sellerInfo) return;
-    try {
-      const res = await fetch(`/api/seller/orders?sellerId=${sellerInfo.id}&status=OUT_FOR_DELIVERY`);
-      const data = await res.json();
-      const inTransitRes = await fetch(`/api/seller/orders?sellerId=${sellerInfo.id}&status=IN_TRANSIT`);
-      const inTransitData = await inTransitRes.json();
-      setTrackingOrders([...(data.orders || []), ...(inTransitData.orders || [])]);
-    } catch (err) {
-      // ignore
-    }
-  };
+
 
   useEffect(() => {
     const checkAuth = () => {
@@ -238,7 +205,6 @@ export default function SellerDashboard() {
     if (sellerInfo && sellerInfo.id) {
       fetchProducts(1)
       fetchOrders(1)
-      fetchTrackingOrders(); // Initial fetch for tracking orders
       // Set up SSE for real-time product and order updates
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
@@ -253,7 +219,6 @@ export default function SellerDashboard() {
               fetchProducts(currentPage);
             } else if (data.title.toLowerCase().includes('order')) {
               fetchOrders(currentPage);
-              fetchTrackingOrders(); // Refresh tracking orders on order updates
             }
           }
         } catch (e) {
@@ -378,56 +343,9 @@ export default function SellerDashboard() {
     }
   }
 
-  useEffect(() => {
-    if (!GOOGLE_MAPS_API_KEY || trackingOrders.length === 0) return;
-    trackingOrders.forEach(order => {
-      const mapId = `live-map-${order.id}`;
-      if (!order.customerAddress) return;
-      loadGoogleMapsScript(GOOGLE_MAPS_API_KEY, () => {
-        if (!(window as any).google || !(window as any).google.maps) return;
-        if (!navigator.geolocation) return;
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const origin = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            };
-            const map = new (window as any).google.maps.Map(document.getElementById(mapId), {
-              zoom: 14,
-              center: origin,
-            });
-            const directionsService = new (window as any).google.maps.DirectionsService();
-            const directionsRenderer = new (window as any).google.maps.DirectionsRenderer();
-            directionsRenderer.setMap(map);
-            directionsService.route(
-              {
-                origin,
-                destination: order.customerAddress,
-                travelMode: "DRIVING",
-              },
-              (result: any, status: string) => {
-                if (status === "OK") {
-                  directionsRenderer.setDirections(result);
-                }
-              }
-            );
-          },
-          (error) => {
-            // fallback: just show destination
-            const map = new (window as any).google.maps.Map(document.getElementById(mapId), {
-              zoom: 14,
-              center: { lat: 20.5937, lng: 78.9629 }, // India center
-            });
-            new (window as any).google.maps.Marker({
-              position: { lat: 20.5937, lng: 78.9629 },
-              map,
-              title: "Could not get your location",
-            });
-          }
-        );
-      });
-    });
-  }, [trackingOrders, GOOGLE_MAPS_API_KEY]);
+
+
+
 
   if (isLoading) {
     return (
@@ -850,51 +768,7 @@ export default function SellerDashboard() {
                 ))
               )}
             </div>
-            {trackingOrders.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-bold mb-2">Live Delivery Tracking</h3>
-                {trackingOrders.map((order) => {
-                  const mapId = `live-map-${order.id}`;
-                  return (
-                    <Card key={order.id} className="mb-4">
-                      <CardContent className="p-4">
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <MapPin className="h-4 w-4 text-green-600" />
-                              <span className="font-medium">Order #{order.orderNumber || order.id}</span>
-                            </div>
-                            <p className="text-sm text-gray-600 ml-6">Delivering to: {order.customerAddress}</p>
-                            <p className="text-sm text-gray-500 ml-6">Customer: {order.customerName}</p>
-                          </div>
-                          <div className="flex flex-col gap-2 items-end">
-                            <span className="text-xs text-gray-500">Status: {order.orderStatus}</span>
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                const origin = "Current+Location";
-                                const dest = encodeURIComponent(order.customerAddress);
-                                window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}`);
-                              }}
-                            >
-                              <Navigation className="h-4 w-4 mr-2" />
-                              View Route
-                            </Button>
-                            <p className="text-xs text-gray-500 mt-1">
-                              If Google Maps shows the same source and destination, please enable location access in your browser or try on a mobile device.
-                            </p>
-                          </div>
-                        </div>
-                        {/* Custom Google Map */}
-                        <div className="mt-4" style={{ height: 300 }}>
-                          <div id={mapId} style={{ width: "100%", height: 300 }} />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+
           </TabsContent>
 
           {/* Analytics Tab */}
@@ -1185,12 +1059,8 @@ export default function SellerDashboard() {
           </div>
         </div>
       )}
-      {/* Google Maps Script */}
-      <Script
-        src={`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`}
-        strategy="afterInteractive"
-        onLoad={() => setMapsLoaded(true)}
-      />
+
+
     </div>
   )
 }

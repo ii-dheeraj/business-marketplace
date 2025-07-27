@@ -28,12 +28,14 @@ import { useSearchParams } from "next/navigation"
 
 interface CompletedOrder {
   orderId: string
+  orderNumber: string
   orderStatus: string
   paymentStatus: string
   transactionStatus: string
   paymentMethod: string
   totalAmount: number
   estimatedDelivery: string
+  deliveryOTP?: string
   items?: any[]
   customerDetails?: any
   paymentDetails?: any
@@ -278,6 +280,42 @@ export default function OrderSuccessPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Delivery OTP */}
+            {order.deliveryOTP && (
+              <Card className="border-2 border-blue-200 bg-blue-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-blue-800">
+                    <Smartphone className="h-5 w-5" />
+                    Delivery OTP
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-center">
+                    <p className="font-medium text-blue-800 mb-3">Share this OTP with the delivery agent when they arrive</p>
+                    <div className="bg-white p-6 rounded-lg border-2 border-blue-300 inline-block shadow-lg">
+                      <span className="text-4xl font-bold text-blue-600 tracking-wider font-mono">
+                        {order.deliveryOTP}
+                      </span>
+                    </div>
+                    <p className="text-sm text-blue-700 mt-4">
+                      This OTP is valid until delivery is completed
+                    </p>
+                  </div>
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <div className="flex items-start gap-3">
+                      <Clock className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-yellow-800">Important</p>
+                        <p className="text-sm text-yellow-700">
+                          Keep this OTP safe. The delivery agent will ask for it to verify your identity and complete the delivery.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Next Steps */}
             <Card>

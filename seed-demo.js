@@ -13,7 +13,8 @@ async function main() {
         name: 'Demo Customer',
         email: 'customer@example.com',
         password: await bcrypt.hash('customer123', 10),
-        phone: '+91 98765 43210'
+        phone: '+91 98765 43210',
+        countryCode: '+91'
       }
     });
     console.log('✅ Demo Customer created:', demoCustomer.email);
@@ -25,6 +26,7 @@ async function main() {
         email: 'seller@example.com',
         password: await bcrypt.hash('seller123', 10),
         phone: '+91 98765 43211',
+        countryCode: '+91',
         businessName: 'Sharma Electronics',
         category: 'electronics-appliances',
         subcategories: JSON.stringify(['Mobile Stores', 'Laptop / Computer Stores', 'TV & Home Appliances Stores']),

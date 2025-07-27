@@ -26,6 +26,7 @@ import Image from "next/image"
 import { CartDrawer } from "@/components/cart-drawer"
 import { useCart } from "@/hooks/useCart"
 import { useLocation } from "@/hooks/useLocation"
+import { Footer } from "@/components/ui/footer"
 
 import { getCookie, deleteCookie } from "@/lib/utils"
 
@@ -627,82 +628,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <h3 className="text-xl font-bold mb-4">LocalMarket</h3>
-              <p className="text-gray-400 text-sm">
-                Connecting communities through local commerce. Discover, shop, and support businesses in your
-                neighborhood.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">For Customers</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>
-                  <Link href="/browse" className="hover:text-white">
-                    Browse Businesses
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/auth/register" className="hover:text-white">
-                    Create Account
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/support" className="hover:text-white">
-                    Customer Support
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">For Businesses</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>
-                  <Link href="/seller/register" className="hover:text-white">
-                    Become a Seller
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/seller/login" className="hover:text-white">
-                    Seller Dashboard
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/seller/support" className="hover:text-white">
-                    Seller Support
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>
-                  <Link href="/about" className="hover:text-white">
-                    About Us
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/careers" className="hover:text-white">
-                    Careers
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/contact" className="hover:text-white">
-                    Contact
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; 2024 LocalMarket. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <Footer variant="default" />
 
     </div>
   )

@@ -51,6 +51,7 @@ model Customer {
   name     String
   email    String  @unique
   phone    String?
+  countryCode String @default("+91")
   password String
   avatar   String?
 
@@ -69,6 +70,7 @@ model Seller {
   name     String
   email    String  @unique
   phone    String?
+  countryCode String @default("+91")
   password String
   avatar   String?
 
@@ -104,6 +106,7 @@ model DeliveryAgent {
   name     String
   email    String  @unique
   phone    String?
+  countryCode String @default("+91")
   password String
   avatar   String?
 

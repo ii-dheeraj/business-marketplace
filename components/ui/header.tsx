@@ -89,7 +89,6 @@ export default function Header() {
     
     // Check when window gains focus
     const handleFocus = () => {
-      console.log("[Header] Window focused, checking auth state...")
       checkAuthState()
     }
     

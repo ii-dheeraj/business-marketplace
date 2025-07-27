@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { InputOTP } from "@/components/ui/input-otp";
 import { useRouter } from "next/navigation";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 export default function SellerSignupForm({ onSuccess }: { onSuccess?: () => void }) {
   const [form, setForm] = useState({
@@ -23,6 +24,7 @@ export default function SellerSignupForm({ onSuccess }: { onSuccess?: () => void
     businessImage: "",
     email: "",
     phone: "",
+    countryCode: "+91",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -63,6 +65,7 @@ export default function SellerSignupForm({ onSuccess }: { onSuccess?: () => void
           name: form.name.trim(),
           email: form.email.trim(),
           phone: form.phone.trim(),
+          countryCode: form.countryCode,
           businessName: form.businessName.trim(),
           category: form.category,
           subcategories: JSON.stringify([form.subcategory]),
@@ -222,7 +225,7 @@ export default function SellerSignupForm({ onSuccess }: { onSuccess?: () => void
       </div>
       <div>
         <Label htmlFor="phone">Phone Number <span className="text-red-500">*</span></Label>
-        <Input id="phone" value={form.phone} onChange={e => handleChange("phone", e.target.value.replace(/[^0-9]/g, "").slice(0, 10))} required maxLength={10} placeholder="10-digit phone number" />
+        <PhoneInput id="phone" value={form.phone} onChange={e => handleChange("phone", e.target.value)} required maxLength={10} placeholder="10-digit phone number" />
       </div>
       <div>
         <Label htmlFor="email">Email</Label>

@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { supabase, createOrder, createSellerOrder, createPayment } from "@/lib/database"
 import { realtimeManager } from "@/lib/realtime"
-import { generateParcelOTP, setOrderParcelOTP } from "@/lib/database";
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,6 +54,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Generate delivery OTP
+    const deliveryOTP = Math.floor(100000 + Math.random() * 900000).toString()
+    
     let order
     try {
       order = await createOrder({
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
         totalAmount,
         paymentMethod: paymentMethod.toUpperCase(),
         deliveryInstructions,
+        deliveryOTP, // Add OTP to order creation
         items: items.map((item: any) => ({
           productId: Number(item.productId),
           quantity: item.quantity,
@@ -146,18 +149,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Order tracking creation failed', details: String(err) }, { status: 500 })
     }
 
+
+
     // Send real-time notifications
     try {
       // Notify customer about order placement
       await realtimeManager.sendNotification(customerId.toString(), {
         type: 'order_update',
         title: 'Order Placed Successfully! 🎉',
-        message: `Your order #${order.orderNumber} has been placed and is being processed.`,
+        message: `Your order #${order.orderNumber} has been placed and is being processed. Your delivery OTP is ${deliveryOTP}.`,
         data: {
           orderId: order.id,
           orderNumber: order.orderNumber,
           totalAmount: order.totalAmount,
-          estimatedDelivery: "30-45 minutes"
+          estimatedDelivery: "30-45 minutes",
+          deliveryOTP: deliveryOTP
         },
         timestamp: new Date(),
         userId: customerId.toString()
@@ -210,7 +216,8 @@ export async function POST(request: NextRequest) {
         paymentMethod: order.paymentMethod,
         totalAmount: order.totalAmount,
         estimatedDelivery: "30-45 minutes",
-        sellerOrders: sellerOrders.length
+        sellerOrders: sellerOrders.length,
+        deliveryOTP: deliveryOTP // Include OTP in response for customer
       },
     })
   } catch (error) {
@@ -258,7 +265,26 @@ export async function GET(request: NextRequest) {
       try {
         const result = await supabase
           .from('orders')
-          .select('id, orderNumber, orderStatus, customerName, customerPhone, totalAmount, paymentStatus, paymentMethod, created_at, updated_at')
+          .select(`
+            id, 
+            orderNumber, 
+            orderStatus, 
+            customerName, 
+            customerPhone, 
+            customerAddress,
+            totalAmount, 
+            paymentStatus, 
+            paymentMethod, 
+            created_at, 
+            updated_at, 
+            parcel_otp,
+            estimatedDeliveryTime,
+            actualDeliveryTime,
+            deliveryInstructions,
+            order_items(id, productName, quantity, totalPrice),
+            seller_orders(id, status),
+            deliveryAgent:delivery_agents(id, name, phone, vehicleNumber)
+          `)
           .eq('customerId', Number(customerId))
           .order('created_at', { ascending: false })
           .range(skip, skip + limit - 1)
@@ -351,6 +377,7 @@ export async function PATCH(request: NextRequest) {
   }
   try {
     const body = await request.json()
+    console.log('[PATCH DEBUG] Request body:', JSON.stringify(body, null, 2))
     const { 
       orderStatus, 
       paymentStatus, 
@@ -368,6 +395,7 @@ export async function PATCH(request: NextRequest) {
       ...(estimatedDeliveryTime && { estimatedDeliveryTime: new Date(estimatedDeliveryTime) }),
       ...(actualDeliveryTime && { actualDeliveryTime: new Date(actualDeliveryTime) })
     }
+    console.log('[PATCH DEBUG] Update data:', JSON.stringify(updateData, null, 2))
     const { data: order, error } = await supabase
       .from('orders')
       .update(updateData)
@@ -376,43 +404,67 @@ export async function PATCH(request: NextRequest) {
       .single()
     if (error || !order) {
       console.error('[PATCH ERROR] Failed to update order:', error)
-      return NextResponse.json({ error: "Failed to update order" }, { status: 500 })
+      return NextResponse.json({ error: "Failed to update order", details: error }, { status: 500 })
     }
+    console.log('[PATCH DEBUG] Order updated successfully:', order.id)
     // If paymentMethod and paymentDetails are provided, create a payment record
     if (paymentMethod && paymentDetails) {
-      await createPayment({
-        orderId: order.id,
-        userId: order.customerId,
-        amount: order.totalAmount,
-        paymentMethod: paymentMethod.toUpperCase(),
-        transactionId: paymentDetails.utrNumber || paymentDetails.cardLast4 || paymentDetails.walletUtr || `TXN-${Date.now()}`,
-        gateway: paymentMethod.toUpperCase() !== 'CASH_ON_DELIVERY' ? 'PAYMENT_GATEWAY' : undefined
-      })
-      // Update order payment status
-      await supabase
-        .from('orders')
-        .update({ paymentStatus: paymentMethod.toUpperCase() === 'CASH_ON_DELIVERY' ? 'PENDING' : 'COMPLETED' })
-        .eq('id', order.id)
+      try {
+        await createPayment({
+          orderId: order.id,
+          userId: order.customerId,
+          amount: order.totalAmount,
+          paymentMethod: paymentMethod.toUpperCase(),
+          transactionId: paymentDetails.utrNumber || paymentDetails.cardLast4 || paymentDetails.walletUtr || `TXN-${Date.now()}`,
+          gateway: paymentMethod.toUpperCase() !== 'CASH_ON_DELIVERY' ? 'PAYMENT_GATEWAY' : undefined
+        })
+        console.log('[PATCH DEBUG] Payment record created successfully')
+        // Update order payment status
+        await supabase
+          .from('orders')
+          .update({ paymentStatus: paymentMethod.toUpperCase() === 'CASH_ON_DELIVERY' ? 'PENDING' : 'COMPLETED' })
+          .eq('id', order.id)
+      } catch (paymentError) {
+        console.error('[PATCH ERROR] Payment creation failed:', paymentError)
+        return NextResponse.json({ error: "Payment creation failed", details: paymentError }, { status: 500 })
+      }
     }
     // Create tracking entry for status change
     if (orderStatus) {
-      await supabase.from('order_tracking').insert({
-        orderId: order.id,
-        status: orderStatus,
-        description: getStatusDescription(orderStatus),
-        location: getStatusLocation(orderStatus)
-      })
-      // If status is READY_FOR_PICKUP, generate and store OTP
-      if (orderStatus === 'READY_FOR_PICKUP') {
-        const otp = generateParcelOTP();
-        await setOrderParcelOTP(order.id, otp);
+      try {
+        await supabase.from('order_tracking').insert({
+          orderId: order.id,
+          status: orderStatus,
+          description: getStatusDescription(orderStatus),
+          location: getStatusLocation(orderStatus)
+        })
+        console.log('[PATCH DEBUG] Tracking entry created successfully')
+      } catch (trackingError) {
+        console.error('[PATCH ERROR] Tracking entry creation failed:', trackingError)
+        return NextResponse.json({ error: "Tracking entry creation failed", details: trackingError }, { status: 500 })
       }
     }
     // Send real-time notifications for order status changes
     if (orderStatus) {
       try {
         // Notify customer about order status change
-        // (Notification logic remains unchanged)
+        await realtimeManager.sendOrderStatusChange(
+          order.customerId.toString(),
+          order.id.toString(),
+          order.orderNumber,
+          orderStatus
+        )
+        
+        // Special notification for OUT_FOR_DELIVERY status
+        if (orderStatus === 'OUT_FOR_DELIVERY') {
+          await realtimeManager.sendDeliveryUpdate(
+            order.customerId.toString(),
+            order.id.toString(),
+            order.orderNumber,
+            'OUT_FOR_DELIVERY',
+            'Your order is out for delivery! The delivery agent is on the way to your location.'
+          )
+        }
       } catch (error) {
         console.error("Error sending real-time notifications:", error)
         // Don't fail the update if notifications fail
@@ -421,7 +473,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true, order })
   } catch (error) {
     console.error("Error updating order:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error", details: error }, { status: 500 })
   }
 }
 

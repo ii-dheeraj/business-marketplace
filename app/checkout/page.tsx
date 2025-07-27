@@ -41,6 +41,16 @@ export default function CheckoutPage() {
     pincode: "",
   })
   const [isFormValid, setIsFormValid] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set())
+  const [isClient, setIsClient] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Set client flag to prevent hydration mismatch
+  useEffect(() => {
+    setIsClient(true)
+    setIsLoading(false)
+  }, [])
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -49,17 +59,77 @@ export default function CheckoutPage() {
     }
   }, [cart.items.length, router])
 
-  // Load saved customer details
+  // Load saved customer details and auto-fill from logged in user
   useEffect(() => {
+    if (!isClient) return // Only run on client side
+    const autoFilled = new Set<string>()
+    
+    // First try to get user info from cookie
+    const userInfoCookie = getCookie("userInfo")
+    console.log("🔍 Debug: User info cookie found:", !!userInfoCookie)
+    
+    if (userInfoCookie) {
+      try {
+        const userInfo = JSON.parse(userInfoCookie)
+        console.log("🔍 Debug: Parsed user info:", userInfo)
+        
+        if (userInfo && userInfo.userType === "CUSTOMER") {
+          console.log("🔍 Debug: Customer detected, auto-filling...")
+          // Auto-fill customer details from logged in user
+          setCustomerDetails(prev => {
+            const updated = { ...prev }
+            if (userInfo.name) {
+              updated.name = userInfo.name
+              autoFilled.add("name")
+              console.log("🔍 Debug: Auto-filled name:", userInfo.name)
+            }
+            if (userInfo.email) {
+              updated.email = userInfo.email
+              autoFilled.add("email")
+              console.log("🔍 Debug: Auto-filled email:", userInfo.email)
+            }
+            if (userInfo.phone) {
+              updated.phone = userInfo.phone
+              autoFilled.add("phone")
+              console.log("🔍 Debug: Auto-filled phone:", userInfo.phone)
+            }
+            return updated
+          })
+        }
+      } catch (error) {
+        console.error("Error parsing user info:", error)
+      }
+    }
+
+    // Then load any previously saved details (this will override auto-filled data if user has saved custom details)
     const savedDetails = localStorage.getItem("customerDetails")
     if (savedDetails) {
       try {
-        setCustomerDetails(JSON.parse(savedDetails))
+        const parsedDetails = JSON.parse(savedDetails)
+        console.log("🔍 Debug: Found saved details:", parsedDetails)
+        
+        // Only override if the saved details are not empty
+        const nonEmptySavedDetails = Object.fromEntries(
+          Object.entries(parsedDetails).filter(([key, value]) => value && value.toString().trim() !== "")
+        )
+        
+        if (Object.keys(nonEmptySavedDetails).length > 0) {
+          setCustomerDetails(prev => ({
+            ...prev,
+            ...nonEmptySavedDetails
+          }))
+          // Remove auto-filled status for fields that were overridden by saved details
+          Object.keys(nonEmptySavedDetails).forEach(key => {
+            autoFilled.delete(key)
+          })
+        }
       } catch (error) {
         console.error("Error loading customer details:", error)
       }
     }
-  }, [])
+
+    setAutoFilledFields(autoFilled)
+  }, [isClient])
 
   // Save customer details whenever they change
   useEffect(() => {
@@ -81,12 +151,15 @@ export default function CheckoutPage() {
   }
 
   const handleProceedToPayment = async () => {
+    if (loading) return; // Prevent double submit
     if (isFormValid) {
+      setLoading(true)
       // Get buyerId from cookie
       const userInfoCookie = getCookie("userInfo")
       const buyerId = userInfoCookie ? JSON.parse(userInfoCookie).id : null
       if (!buyerId) {
         alert("You must be logged in to place an order.")
+        setLoading(false)
         return
       }
       // Prepare order data
@@ -121,6 +194,7 @@ export default function CheckoutPage() {
         body: JSON.stringify(orderData),
       })
       const data = await res.json()
+      setLoading(false)
       if (res.ok && data.order && data.order.id) {
         router.push(`/payment?orderId=${data.order.id}`)
       } else {
@@ -133,7 +207,23 @@ export default function CheckoutPage() {
   const finalTotal = cart.totalPrice + deliveryFee
 
   if (cart.items.length === 0) {
-    return null // Will redirect
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p>Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p>Loading checkout...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -162,51 +252,86 @@ export default function CheckoutPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Auto-fill notification */}
+                {!isLoading && isClient && autoFilledFields.size > 0 && (
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-blue-600" />
+                      <p className="text-sm text-blue-800">
+                        Your profile details have been auto-filled. You can edit them if needed.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+
+
                 {/* Personal Information */}
                 <div>
                   <h3 className="text-lg font-medium mb-4">Personal Information</h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="name" className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        Full Name *
-                      </Label>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label htmlFor="name" className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          Full Name *
+                        </Label>
+                        {!isLoading && isClient && autoFilledFields.has("name") && (
+                          <Badge variant="secondary" className="text-xs">
+                            Auto-filled
+                          </Badge>
+                        )}
+                      </div>
                       <Input
                         id="name"
                         value={customerDetails.name}
                         onChange={(e) => handleInputChange("name", e.target.value)}
                         placeholder="Enter your full name"
-                        className="mt-1"
+                        className={`mt-1 ${!isLoading && isClient && autoFilledFields.has("name") ? "bg-blue-50 border-blue-200" : ""}`}
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="phone" className="flex items-center gap-2">
-                        <Phone className="h-4 w-4" />
-                        Phone Number *
-                      </Label>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label htmlFor="phone" className="flex items-center gap-2">
+                          <Phone className="h-4 w-4" />
+                          Phone Number *
+                        </Label>
+                        {!isLoading && isClient && autoFilledFields.has("phone") && (
+                          <Badge variant="secondary" className="text-xs">
+                            Auto-filled
+                          </Badge>
+                        )}
+                      </div>
                       <Input
                         id="phone"
                         type="tel"
                         value={customerDetails.phone}
                         onChange={(e) => handleInputChange("phone", e.target.value)}
                         placeholder="Enter your phone number"
-                        className="mt-1"
+                        className={`mt-1 ${!isLoading && isClient && autoFilledFields.has("phone") ? "bg-blue-50 border-blue-200" : ""}`}
                         required
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <Label htmlFor="email" className="flex items-center gap-2">
-                        <Mail className="h-4 w-4" />
-                        Email Address *
-                      </Label>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label htmlFor="email" className="flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          Email Address *
+                        </Label>
+                        {!isLoading && isClient && autoFilledFields.has("email") && (
+                          <Badge variant="secondary" className="text-xs">
+                            Auto-filled
+                          </Badge>
+                        )}
+                      </div>
                       <Input
                         id="email"
                         type="email"
                         value={customerDetails.email}
                         onChange={(e) => handleInputChange("email", e.target.value)}
                         placeholder="Enter your email address"
-                        className="mt-1"
+                        className={`mt-1 ${!isLoading && isClient && autoFilledFields.has("email") ? "bg-blue-50 border-blue-200" : ""}`}
                         required
                       />
                     </div>
@@ -358,8 +483,8 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Proceed Button */}
-                <Button className="w-full" size="lg" onClick={handleProceedToPayment} disabled={!isFormValid}>
-                  Proceed to Payment
+                <Button className="w-full" size="lg" onClick={handleProceedToPayment} disabled={!isFormValid || loading}>
+                  {loading ? "Processing..." : "Proceed to Payment"}
                 </Button>
 
                 {!isFormValid && (

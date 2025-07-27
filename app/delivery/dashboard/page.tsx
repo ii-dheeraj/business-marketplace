@@ -1,14 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Package, MapPin, Clock, DollarSign, Navigation, Phone, CheckCircle, Users } from "lucide-react"
+import { Package, MapPin, Clock, DollarSign, Navigation, Phone, CheckCircle } from "lucide-react"
 import { getCookie } from "@/lib/utils"
-import CustomerSignupForm from "@/components/CustomerSignupForm"
 
 // Mock data
 const stats = {
@@ -19,8 +17,9 @@ const stats = {
 }
 
 export default function DeliveryDashboard() {
-  const router = useRouter()
   const [activeTab, setActiveTab] = useState("available")
+  const [locationStatus, setLocationStatus] = useState("")
+  const [dataLoading, setDataLoading] = useState(false)
   const [availableOrders, setAvailableOrders] = useState<any[]>([])
   const [activeDeliveries, setActiveDeliveries] = useState<any[]>([])
   const [deliveryHistory, setDeliveryHistory] = useState<any[]>([])
@@ -30,108 +29,52 @@ export default function DeliveryDashboard() {
   const [agentId, setAgentId] = useState<number | null>(null)
   const [stats, setStats] = useState<any>({ totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
 
-  // Add OTP and GPS tracking logic inside DeliveryDashboard
-  const [otpInput, setOtpInput] = useState("");
-  const [otpStatus, setOtpStatus] = useState("");
-  const [locationStatus, setLocationStatus] = useState("");
-
   useEffect(() => {
-    const checkAuth = () => {
-      // Get delivery agent name and id from userInfo cookie
-      const userInfoCookie = getCookie("userInfo")
-      const userTypeCookie = getCookie("userType")
-      
-      console.log("[DEBUG] Delivery Auth check - userInfo:", userInfoCookie ? "exists" : "missing")
-      console.log("[DEBUG] Delivery Auth check - userType:", userTypeCookie)
-      console.log("[DEBUG] Raw userInfo cookie value:", userInfoCookie)
-      console.log("[DEBUG] userInfo cookie length:", userInfoCookie?.length)
-      console.log("[DEBUG] userInfo cookie type:", typeof userInfoCookie)
-
-      // Check if user is authenticated and is a delivery agent
-      if (!userInfoCookie || userTypeCookie !== "DELIVERY_AGENT") {
-        console.log("[DEBUG] Missing delivery auth - userInfo:", !!userInfoCookie, "userType:", userTypeCookie)
-        setLoading(false)
-        if (userTypeCookie && userTypeCookie !== "DELIVERY_AGENT") {
-          // User is logged in but not a delivery agent
-          router.push("/")
-        } else {
-          // User is not logged in
-          router.push("/auth/login")
-        }
-        return
-      }
-
-      let deliveryAgentId = null
+    // Get delivery agent name and id from userInfo cookie
+    const userInfoCookie = getCookie("userInfo")
+    let deliveryAgentId = null
+    if (userInfoCookie) {
       try {
-        console.log("[DEBUG] Attempting to parse userInfo cookie...")
-        
-        // Try to decode the cookie if it's URL encoded
-        let decodedCookie = userInfoCookie
-        try {
-          decodedCookie = decodeURIComponent(userInfoCookie)
-          console.log("[DEBUG] Decoded cookie:", decodedCookie)
-        } catch (decodeError) {
-          console.log("[DEBUG] Cookie is not URL encoded, using as-is")
-        }
-        
-        const user = JSON.parse(decodedCookie)
-        console.log("[DEBUG] Parsed user object:", user)
-        console.log("[DEBUG] Setting delivery agent info:", user)
+        const user = JSON.parse(userInfoCookie)
         setAgentName(user.name || "")
         setAgentId(user.id)
         deliveryAgentId = user.id
-      } catch (error) {
-        console.log("[DEBUG] Failed to parse userInfo cookie:", error)
-        console.log("[DEBUG] Cookie value that failed to parse:", userInfoCookie)
-        console.log("[DEBUG] Cookie value (stringified):", JSON.stringify(userInfoCookie))
-        
-        // Try to fix the cookie by clearing it and redirecting to login
-        console.log("[DEBUG] Clearing corrupted cookie and redirecting to login")
-        setLoading(false)
-        router.push("/auth/login")
-        return
-      }
-      
-      // Fetch orders and stats
-      const fetchOrders = async () => {
-        setLoading(true)
-        setError("")
-        try {
-          const url = deliveryAgentId ? `/api/delivery/orders?deliveryAgentId=${deliveryAgentId}` : "/api/delivery/orders"
-          const res = await fetch(url)
-          const data = await res.json()
-          if (res.ok) {
-            setAvailableOrders(data.availableOrders || [])
-            setActiveDeliveries(data.activeDeliveries || [])
-            setStats(data.stats || { totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
-          } else {
-            setError(data.error || "Failed to fetch orders")
-          }
-        } catch (err) {
-          setError("Failed to fetch orders")
-        } finally {
-          setLoading(false)
-        }
-      }
-      const fetchHistory = async () => {
-        if (!deliveryAgentId) return
-        try {
-          const res = await fetch(`/api/order/place?deliveryAgentId=${deliveryAgentId}&status=DELIVERED`)
-          const data = await res.json()
-          if (res.ok && data.orders) {
-            setDeliveryHistory(data.orders)
-          }
-        } catch (err) {
-          // ignore
-        }
-      }
-      fetchOrders()
-      fetchHistory()
+      } catch {}
     }
-    
-    // Add a small delay to ensure cookies are set after registration
-    setTimeout(checkAuth, 500)
-  }, [router])
+    // Fetch orders and stats
+    const fetchOrders = async () => {
+      setLoading(true)
+      setError("")
+      try {
+        const url = deliveryAgentId ? `/api/delivery/orders?deliveryAgentId=${deliveryAgentId}` : "/api/delivery/orders"
+        const res = await fetch(url)
+        const data = await res.json()
+        if (res.ok) {
+          setAvailableOrders(data.availableOrders || [])
+          setActiveDeliveries(data.activeDeliveries || [])
+          setStats(data.stats || { totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
+        } else {
+          setError(data.error || "Failed to fetch orders")
+        }
+      } catch (err) {
+        setError("Failed to fetch orders")
+      } finally {
+        setLoading(false)
+      }
+    }
+    const fetchHistory = async () => {
+      if (!deliveryAgentId) return
+      try {
+        const res = await fetch(`/api/order/place?deliveryAgentId=${deliveryAgentId}&status=DELIVERED`)
+        const data = await res.json()
+        if (res.ok && data.orders) {
+          setDeliveryHistory(data.orders)
+        }
+      } catch {}
+    }
+    fetchOrders()
+    fetchHistory()
+  }, [])
 
   const refreshOrders = async () => {
     if (!agentId) return
@@ -183,23 +126,19 @@ export default function DeliveryDashboard() {
     } catch {}
   }
 
-  // Function to handle OTP submit for a given order
-  const handleOtpSubmit = async (orderId: string) => {
-    setOtpStatus("Validating...");
-    const res = await fetch("/api/delivery/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "validate_otp", orderId, otp: otpInput })
-    });
-    const data = await res.json();
-    if (data.success) {
-      setOtpStatus("OTP Validated! Parcel picked.");
-      setOtpInput("");
-      refreshOrders();
-    } else {
-      setOtpStatus(data.error || "Invalid OTP");
-    }
-  };
+  const handlePickupParcel = async (orderId: string) => {
+    if (!agentId) return
+    try {
+      const res = await fetch("/api/delivery/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, deliveryAgentId: agentId, action: "picked_up" })
+      })
+      if (res.ok) {
+        refreshOrders()
+      }
+    } catch {}
+  }
 
   // Function to update GPS location for all active deliveries
   const updateLocation = async () => {
@@ -298,9 +237,9 @@ export default function DeliveryDashboard() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="available">Available Orders</TabsTrigger>
+            <TabsTrigger value="pickup">Ready for Pickup</TabsTrigger>
             <TabsTrigger value="active">Active Deliveries</TabsTrigger>
             <TabsTrigger value="history">Delivery History</TabsTrigger>
-            <TabsTrigger value="customers">Customers</TabsTrigger>
           </TabsList>
 
           <TabsContent value="available" className="space-y-6">
@@ -376,10 +315,137 @@ export default function DeliveryDashboard() {
             )}
           </TabsContent>
 
+          <TabsContent value="pickup" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Ready for Pickup</h2>
+              <Badge variant="default">{activeDeliveries.filter(d => d.status === "READY_FOR_PICKUP").length} ready</Badge>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>Loading pickup orders...</p>
+              </div>
+            ) : error ? (
+              <div className="text-center py-8 text-red-500">
+                <p>{error}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {activeDeliveries.filter(delivery => delivery.status === "READY_FOR_PICKUP").map((delivery) => (
+                  <Card key={delivery.id} className="border-orange-200 bg-orange-50">
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">Order #{delivery.id}</h3>
+                          <p className="text-gray-600">Customer: {delivery.customer}</p>
+                          <Badge variant="default" className="mt-1 bg-orange-500">
+                            Ready for Pickup
+                          </Badge>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-green-600">₹{delivery.deliveryFee}</p>
+                          <p className="text-sm text-gray-500">Delivery fee</p>
+                        </div>
+                      </div>
+
+                      {/* Seller Information */}
+                      <div className="mb-4 p-4 bg-white rounded-lg border">
+                        <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                          <Package className="h-4 w-4 text-orange-600" />
+                          Seller Information
+                        </h4>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Seller Name:</p>
+                            <p className="text-sm text-gray-600">{delivery.seller}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Seller Phone:</p>
+                            <p className="text-sm text-gray-600">{delivery.sellerPhone}</p>
+                          </div>
+                        </div>
+                        <div className="mt-2">
+                          <p className="text-sm font-medium text-gray-700">Seller Address:</p>
+                          <p className="text-sm text-gray-600">{delivery.sellerAddress}</p>
+                        </div>
+                      </div>
+
+                      {/* Product Information */}
+                      <div className="mb-4 p-4 bg-white rounded-lg border">
+                        <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                          <Package className="h-4 w-4 text-blue-600" />
+                          Product Details
+                        </h4>
+                        {delivery.productDetails && delivery.productDetails.length > 0 ? (
+                          <div className="space-y-2">
+                            {delivery.productDetails.map((product: any, index: number) => (
+                              <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-700">{product.name}</p>
+                                  <p className="text-xs text-gray-500">Quantity: {product.quantity}</p>
+                                </div>
+                                <p className="text-sm font-medium text-gray-700">₹{product.price}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">No product details available</p>
+                        )}
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <MapPin className="h-4 w-4 text-orange-600" />
+                            <span className="font-medium">Pickup Location</span>
+                          </div>
+                          <p className="text-sm text-gray-600 ml-6">{delivery.pickup}</p>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <MapPin className="h-4 w-4 text-green-600" />
+                            <span className="font-medium">Delivery Location</span>
+                          </div>
+                          <p className="text-sm text-gray-600 ml-6">{delivery.delivery}</p>
+                          <p className="text-sm text-gray-500 ml-6">Customer: {delivery.customer}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between mb-4 text-sm text-gray-600">
+                        <span>Total Amount: ₹{delivery.amount}</span>
+                        <span>Distance: {delivery.distance}</span>
+                        <span>Est. Time: {delivery.estimatedTime}</span>
+                      </div>
+
+                      <div className="flex flex-col gap-2 mt-4 p-4 bg-white rounded-lg border">
+                        <Button onClick={() => handlePickupParcel(delivery.id)} className="mt-2 bg-orange-600 hover:bg-orange-700">
+                          <Package className="h-4 w-4 mr-2" />
+                          Pickup Parcel
+                        </Button>
+                        <p className="text-xs text-gray-500 text-center">Click to confirm parcel pickup from seller</p>
+                      </div>
+
+                      <div className="flex gap-2 mt-4">
+                        <Button variant="outline" onClick={() => handleViewRoute(delivery.pickup, delivery.delivery)}>
+                          <Navigation className="h-4 w-4 mr-2" />
+                          Navigate to Pickup
+                        </Button>
+                        <Button variant="outline" onClick={() => handleCallCustomer(delivery.customerPhone)}>
+                          <Phone className="h-4 w-4 mr-2" />
+                          Call Customer
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
           <TabsContent value="active" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Active Deliveries</h2>
-              <Badge variant="default">{activeDeliveries.length} active</Badge>
+              <Badge variant="default">{activeDeliveries.filter(d => d.status !== "READY_FOR_PICKUP").length} active</Badge>
             </div>
 
             {loading ? (
@@ -392,7 +458,7 @@ export default function DeliveryDashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {activeDeliveries.map((delivery) => (
+                {activeDeliveries.filter(delivery => delivery.status !== "READY_FOR_PICKUP").map((delivery) => (
                   <Card key={delivery.id} className="border-blue-200 bg-blue-50">
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
@@ -423,24 +489,6 @@ export default function DeliveryDashboard() {
                         <span>ETA: {delivery.estimatedTime}</span>
                       </div>
 
-                      {delivery.status === "READY_FOR_PICKUP" && (
-                        <div className="flex flex-col gap-2 mt-2">
-                          <label htmlFor={`otp-${delivery.id}`}>Enter OTP from Seller:</label>
-                          <input
-                            id={`otp-${delivery.id}`}
-                            type="text"
-                            value={otpInput}
-                            onChange={e => setOtpInput(e.target.value)}
-                            className="border rounded px-2 py-1"
-                            maxLength={6}
-                          />
-                          <Button onClick={() => handleOtpSubmit(delivery.id)}>
-                            Confirm Parcel Pickup
-                          </Button>
-                          {otpStatus && <span className="text-xs text-blue-600">{otpStatus}</span>}
-                        </div>
-                      )}
-
                       <div className="flex gap-2">
                         <Button onClick={() => handleCompleteDelivery(delivery.id)} className="flex-1">
                           <CheckCircle className="h-4 w-4 mr-2" />
@@ -455,7 +503,6 @@ export default function DeliveryDashboard() {
                           Call Customer
                         </Button>
                       </div>
-                      {locationStatus && <div className="text-xs text-blue-600 mt-2">{locationStatus}</div>}
                     </CardContent>
                   </Card>
                 ))}
@@ -511,31 +558,6 @@ export default function DeliveryDashboard() {
                 ))}
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="customers" className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <h2 className="text-2xl font-bold">Customer Registration</h2>
-              <p className="text-sm text-gray-600">Help customers create accounts for delivery services</p>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Register New Customer</CardTitle>
-                <CardDescription>
-                  Create a customer account for someone who wants to use delivery services. 
-                  This will redirect them to the customer dashboard after successful registration.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="py-6">
-                <CustomerSignupForm 
-                  onSuccess={() => {
-                    // Show success message
-                    alert("Customer registered successfully! The customer has been redirected to their dashboard.");
-                  }}
-                />
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>

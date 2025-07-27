@@ -145,6 +145,8 @@ export default function SellerLogin() {
               <br />
               Email: seller@example.com
               <br />
+              Phone: +91 9876543211
+              <br />
               Password: seller123
             </p>
           </div>
