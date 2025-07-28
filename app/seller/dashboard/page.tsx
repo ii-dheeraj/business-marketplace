@@ -154,7 +154,7 @@ export default function SellerDashboard() {
   // No longer needed since we're using data URLs instead of blob URLs
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       const userInfoCookie = getCookie("userInfo")
       const userTypeCookie = getCookie("userType")
       
@@ -164,7 +164,7 @@ export default function SellerDashboard() {
       console.log("[DEBUG] userInfo cookie length:", userInfoCookie?.length)
       console.log("[DEBUG] userInfo cookie type:", typeof userInfoCookie)
       
-      if (userInfoCookie && userTypeCookie === "SELLER") {
+      if (userInfoCookie && userTypeCookie && userTypeCookie.toUpperCase() === "SELLER") {
         try {
           console.log("[DEBUG] Attempting to parse userInfo cookie...")
           
@@ -179,17 +179,36 @@ export default function SellerDashboard() {
           
           const user = JSON.parse(decodedCookie)
           console.log("[DEBUG] Parsed user object:", user)
-          console.log("[DEBUG] Setting seller info:", user)
+          
+          console.log("[DEBUG] Setting seller info from cookie:", user)
           setSellerInfo(user)
+          
+          // Fetch complete user data from API to get business image
+          try {
+            const res = await fetch(`/api/seller/profile?id=${user.id}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.seller) {
+                console.log("[DEBUG] Fetched complete seller data:", data.seller);
+                setSellerInfo(data.seller);
+              }
+            }
+          } catch (error) {
+            console.log("[DEBUG] Failed to fetch complete seller data:", error);
+            // Continue with cookie data if API fails
+          }
           setIsLoading(false)
           return // Success - don't redirect
         } catch (error) {
           console.log("[DEBUG] Failed to parse userInfo cookie:", error)
           console.log("[DEBUG] Cookie value that failed to parse:", userInfoCookie)
-          console.log("[DEBUG] Cookie value (stringified):", JSON.stringify(userInfoCookie))
           
-          // Try to fix the cookie by clearing it and redirecting to login
-          console.log("[DEBUG] Clearing corrupted cookie and redirecting to login")
+          // Clear the corrupted cookie
+          deleteCookie("userInfo")
+          deleteCookie("userType")
+          deleteCookie("userId")
+          
+          console.log("[DEBUG] Cleared corrupted cookies and redirecting to login")
           setSellerInfo(null)
           router.push("/auth/login")
         }

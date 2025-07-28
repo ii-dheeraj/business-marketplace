@@ -1,67 +1,52 @@
-import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/database";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Test database connection and performance
-    const startTime = Date.now()
+    // Check environment variables
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
     
-    const [orderCount, productCount, customerCount] = await Promise.all([
-      prisma.order.count(),
-      prisma.product.count(),
-      prisma.customer.count()
-    ])
-    
-    const endTime = Date.now()
-    const queryTime = endTime - startTime
-    
-    // Test optimized product query
-    const productStart = Date.now()
-    const products = await prisma.product.findMany({
-      take: 5,
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        stock: true,
-        seller: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
+    const envStatus = {
+      supabaseUrl: !!supabaseUrl,
+      supabaseAnonKey: !!supabaseAnonKey,
+      nodeEnv: process.env.NODE_ENV,
+      hasEnvFile: !!(supabaseUrl && supabaseAnonKey)
+    };
+
+    // Test database connection
+    let dbStatus = { connected: false, error: null };
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('count')
+        .limit(1);
+      
+      if (error) {
+        dbStatus = { connected: false, error: error.message };
+      } else {
+        dbStatus = { connected: true, error: null };
       }
-    })
-    const productQueryTime = Date.now() - productStart
-    
+    } catch (error: any) {
+      dbStatus = { connected: false, error: error.message };
+    }
+
     return NextResponse.json({
-      success: true,
-      performance: {
-        totalQueryTime: queryTime,
-        productQueryTime: productQueryTime,
-        queriesPerSecond: (1000 / queryTime).toFixed(2)
-      },
-      counts: {
-        orders: orderCount,
-        products: productCount,
-        customers: customerCount
-      },
-      sampleProducts: products.map(p => ({
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        stock: p.stock,
-        sellerName: p.seller.name
-      }))
-    })
-  } catch (error) {
-    console.error("Database test error:", error)
-    return NextResponse.json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : "Unknown error" 
-    }, { status: 500 })
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      environment: envStatus,
+      database: dbStatus,
+      message: envStatus.hasEnvFile 
+        ? "Environment variables are configured" 
+        : "Environment variables are missing - create .env.local file"
+    });
+
+  } catch (error: any) {
+    return NextResponse.json({
+      status: "error",
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      message: "Test endpoint failed"
+    }, { status: 500 });
   }
 } 

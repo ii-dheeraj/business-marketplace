@@ -4,20 +4,43 @@ import { supabase } from "@/lib/database";
 // Test database connection
 export async function GET(request: NextRequest) {
   try {
-    console.log("[API] Testing database connection...");
-    const { data: testSeller, error } = await supabase
-      .from('sellers')
-      .select('*')
-      .limit(1)
-      .single();
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
     
-    if (error) {
-      console.error("[API] Database connection failed:", error);
-      return NextResponse.json({ error: "Database connection failed" }, { status: 500 });
+    console.log("[API] GET request for seller profile, ID:", id);
+    
+    if (id) {
+      // Fetch specific seller by ID
+      const { data: seller, error } = await supabase
+        .from('sellers')
+        .select('*')
+        .eq('id', Number(id))
+        .single();
+      
+      if (error) {
+        console.error("[API] Error fetching seller by ID:", error);
+        return NextResponse.json({ error: "Seller not found" }, { status: 404 });
+      }
+      
+      console.log("[API] Found seller:", seller?.id);
+      return NextResponse.json({ seller });
+    } else {
+      // Test database connection (original functionality)
+      console.log("[API] Testing database connection...");
+      const { data: testSeller, error } = await supabase
+        .from('sellers')
+        .select('*')
+        .limit(1)
+        .single();
+      
+      if (error) {
+        console.error("[API] Database connection failed:", error);
+        return NextResponse.json({ error: "Database connection failed" }, { status: 500 });
+      }
+      
+      console.log("[API] Database connection successful, found seller:", testSeller?.id);
+      return NextResponse.json({ message: "Database connection working", seller: testSeller });
     }
-    
-    console.log("[API] Database connection successful, found seller:", testSeller?.id);
-    return NextResponse.json({ message: "Database connection working", seller: testSeller });
   } catch (error) {
     console.error("[API] Database connection failed:", error);
     return NextResponse.json({ error: "Database connection failed" }, { status: 500 });

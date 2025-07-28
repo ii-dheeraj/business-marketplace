@@ -5,6 +5,17 @@ import bcrypt from "bcryptjs";
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Supabase is properly configured
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('❌ Supabase configuration missing:', { supabaseUrl: !!supabaseUrl, supabaseAnonKey: !!supabaseAnonKey });
+      return NextResponse.json({ 
+        error: "Database configuration error. Please check environment variables." 
+      }, { status: 500 });
+    }
+
     const body = await request.json();
     const { email, phone, password, otp, step } = body;
 
@@ -59,12 +70,31 @@ export async function POST(request: NextRequest) {
       clearLoginOTP(userPhone);
       // Store user session
       const userSession = await storeUserSession(type, user.id);
+      
+      // Create a minimal user object for cookies (without large data like images)
+      const cookieUser = {
+        id: userSession.id,
+        name: userSession.name,
+        email: userSession.email,
+        phone: userSession.phone,
+        userType: userSession.userType,
+        businessName: userSession.businessName,
+        category: userSession.category,
+        subcategories: userSession.subcategories,
+        businessAddress: userSession.businessAddress,
+        businessCity: userSession.businessCity,
+        businessArea: userSession.businessArea,
+        businessLocality: userSession.businessLocality,
+        businessDescription: userSession.businessDescription,
+        // Don't include businessImage in cookie to prevent corruption
+      };
+      
       const response = NextResponse.json({ 
         success: true, 
         message: `Successfully logged in as ${type}`,
         user: userSession
       });
-      response.cookies.set("userInfo", JSON.stringify(userSession), {
+      response.cookies.set("userInfo", JSON.stringify(cookieUser), {
         httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
@@ -127,12 +157,31 @@ export async function POST(request: NextRequest) {
       }
       // Store user session with complete data
       const userSession = await storeUserSession(userType, user.id);
+      
+      // Create a minimal user object for cookies (without large data like images)
+      const cookieUser = {
+        id: userSession.id,
+        name: userSession.name,
+        email: userSession.email,
+        phone: userSession.phone,
+        userType: userSession.userType,
+        businessName: userSession.businessName,
+        category: userSession.category,
+        subcategories: userSession.subcategories,
+        businessAddress: userSession.businessAddress,
+        businessCity: userSession.businessCity,
+        businessArea: userSession.businessArea,
+        businessLocality: userSession.businessLocality,
+        businessDescription: userSession.businessDescription,
+        // Don't include businessImage in cookie to prevent corruption
+      };
+      
       const response = NextResponse.json({ 
         success: true, 
         message: `Successfully logged in as ${userType}`,
         user: userSession
       });
-      response.cookies.set("userInfo", JSON.stringify(userSession), {
+      response.cookies.set("userInfo", JSON.stringify(cookieUser), {
         httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",

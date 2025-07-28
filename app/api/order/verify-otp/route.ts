@@ -1,83 +1,70 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/database"
+import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/database";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { orderId, otp, deliveryAgentId } = body
+    const body = await request.json();
+    const { orderId, deliveryAgentId, otp } = body;
 
-    if (!orderId || !otp || !deliveryAgentId) {
-      return NextResponse.json({ error: "Missing required fields: orderId, otp, deliveryAgentId" }, { status: 400 })
+    if (!orderId || !deliveryAgentId || !otp) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Fetch the order to get the stored OTP
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('id', Number(orderId))
-      .single()
+    // Get the order to check the stored OTP
+    const { data: order, error: fetchError } = await supabase
+      .from("orders")
+      .select("parcel_otp, orderStatus")
+      .eq("id", Number(orderId))
+      .single();
 
-    if (orderError || !order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 })
+    if (fetchError || !order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    // Check if order is assigned to this delivery agent
-    if (order.deliveryAgentId !== Number(deliveryAgentId)) {
-      return NextResponse.json({ error: "Order is not assigned to this delivery agent" }, { status: 403 })
-    }
-
-    // Check if order is ready for delivery and not already delivered
-    if (order.orderStatus !== 'OUT_FOR_DELIVERY') {
-      return NextResponse.json({ error: "Order is not ready for delivery. Current status: " + order.orderStatus }, { status: 400 })
-    }
-
-    // Check if order is already delivered
-    if (order.orderStatus === 'DELIVERED') {
-      return NextResponse.json({ error: "Order has already been delivered" }, { status: 400 })
-    }
-
-    // Verify the OTP
+    // Verify OTP
     if (order.parcel_otp !== otp) {
-      return NextResponse.json({ error: "Invalid OTP" }, { status: 400 })
+      return NextResponse.json({ 
+        success: false, 
+        error: "Invalid OTP. Please check and try again." 
+      }, { status: 400 });
     }
 
-    // Update order status to DELIVERED
+    // Update order status to PICKED_UP and clear OTP
     const { data: updatedOrder, error: updateError } = await supabase
-      .from('orders')
+      .from("orders")
       .update({ 
-        orderStatus: 'DELIVERED',
-        actualDeliveryTime: new Date().toISOString()
+        orderStatus: "PICKED_UP",
+        parcel_otp: null, // Clear OTP after successful verification
+        updated_at: new Date()
       })
-      .eq('id', Number(orderId))
+      .eq("id", Number(orderId))
       .select()
-      .single()
+      .single();
 
     if (updateError) {
-      return NextResponse.json({ error: "Failed to update order status" }, { status: 500 })
+      console.error("Error updating order status:", updateError);
+      return NextResponse.json({ error: "Failed to update order status" }, { status: 500 });
     }
 
-    // Create tracking entry for delivery
-    await supabase.from('order_tracking').insert({
-      orderId: Number(orderId),
-      status: 'DELIVERED',
-      description: 'Order delivered successfully. OTP verified by delivery agent.',
-      location: 'Customer Location'
-    })
+    // Add tracking entry
+    await supabase
+      .from("order_tracking")
+      .insert({
+        orderId: Number(orderId),
+        status: "PICKED_UP",
+        description: "Parcel picked up successfully with OTP verification",
+        location: "Seller Location"
+      });
 
-    return NextResponse.json({
-      success: true,
-      message: "OTP verified successfully. Order marked as delivered.",
-      order: {
-        id: updatedOrder.id,
-        orderNumber: updatedOrder.orderNumber,
-        orderStatus: updatedOrder.orderStatus,
-        actualDeliveryTime: updatedOrder.actualDeliveryTime
-      }
-    })
+    return NextResponse.json({ 
+      success: true, 
+      message: "OTP verified successfully. Parcel picked up!",
+      order: updatedOrder
+    });
 
   } catch (error) {
-    console.error("Error verifying OTP:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[API] Error verifying OTP:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 

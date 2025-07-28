@@ -42,17 +42,17 @@ export async function POST(request: NextRequest) {
         businessState,
         businessCity,
         businessPincode,
-        businessArea: businessArea || null,
-        businessLocality: businessLocality || null,
-        businessDescription: businessDescription || null,
-        businessImage: businessImage || null,
+        businessArea: businessArea ,
+        businessLocality: businessLocality ,
+        businessDescription: businessDescription ,
+        businessImage: businessImage ,
         avatar: avatar || null,
         deliveryTime: deliveryTime || null,
         email: email || null,
         phone,
         password: hashedPassword,
         name: businessName, // Use businessName as default personal name
-        businessAddress: "-", // Placeholder, required by schema
+        businessAddress: , // Placeholder, required by schema
       }])
       .select()
       .single();

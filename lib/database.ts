@@ -1,7 +1,18 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.SUPABASE_URL as string
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY as string
+// Get environment variables with fallbacks
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://your-project.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'your-anon-key'
+
+// Validate environment variables
+if (!supabaseUrl || supabaseUrl === 'https://your-project.supabase.co') {
+  console.error('❌ SUPABASE_URL is not configured. Please set NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL in your .env.local file')
+}
+
+if (!supabaseAnonKey || supabaseAnonKey === 'your-anon-key') {
+  console.error('❌ SUPABASE_ANON_KEY is not configured. Please set NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_ANON_KEY in your .env.local file')
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Customer functions
@@ -22,13 +33,21 @@ export const createCustomer = async (data: {
 }
 
 export const findCustomerByEmail = async (email: string) => {
-  const { data: customer, error } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('email', email)
-    .single()
-  if (error) return null
-  return customer
+  try {
+    const { data: customer, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('email', email)
+      .single()
+    if (error) {
+      console.error('Error finding customer by email:', error);
+      return null
+    }
+    return customer
+  } catch (error) {
+    console.error('Exception finding customer by email:', error);
+    return null
+  }
 }
 
 export const findCustomerById = async (id: number) => {
@@ -81,13 +100,21 @@ export const createSeller = async (data: {
 }
 
 export const findSellerByEmail = async (email: string) => {
-  const { data: seller, error } = await supabase
-    .from('sellers')
-    .select('*')
-    .eq('email', email)
-    .single()
-  if (error) return null
-  return seller
+  try {
+    const { data: seller, error } = await supabase
+      .from('sellers')
+      .select('*')
+      .eq('email', email)
+      .single()
+    if (error) {
+      console.error('Error finding seller by email:', error);
+      return null
+    }
+    return seller
+  } catch (error) {
+    console.error('Exception finding seller by email:', error);
+    return null
+  }
 }
 
 export const findSellerById = async (id: number) => {

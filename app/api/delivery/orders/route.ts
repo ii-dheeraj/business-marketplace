@@ -161,7 +161,7 @@ export async function PATCH(request: NextRequest) {
     if (action === "accept") {
       updateData.orderStatus = "READY_FOR_DELIVERY"; // Using existing status until DB is updated
     } else if (action === "picked_up") {
-      updateData.orderStatus = "OUT_FOR_DELIVERY"; // Using existing status until DB is updated
+      updateData.orderStatus = "PICKED_UP"; // Updated to use new status
     } else if (action === "delivered") {
       updateData.orderStatus = "DELIVERED";
       updateData.actualDeliveryTime = new Date();

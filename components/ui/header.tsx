@@ -77,6 +77,9 @@ export default function Header() {
           setUserType(user.userType)
         } catch (error) {
           console.log("[Header] Periodic check: Error parsing cookie:", error)
+          deleteCookie("userInfo")
+          setUserInfo(null)
+          setUserType("")
         }
       }
     }
@@ -127,6 +130,7 @@ export default function Header() {
         setUserType(user.userType || userTypeCookie || "")
       } catch (error) {
         console.log("[Header] Manual refresh - error parsing:", error)
+        deleteCookie("userInfo")
         setUserInfo(null)
         setUserType("")
       }

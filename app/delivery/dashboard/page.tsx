@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Package, MapPin, Clock, DollarSign, Navigation, Phone, CheckCircle, User } from "lucide-react"
+import { Package, MapPin, Clock, DollarSign, Navigation, Phone, CheckCircle, User, Key, Map, Truck } from "lucide-react"
 import { getCookie } from "@/lib/utils"
+import DeliveryOTPVerification from "@/components/DeliveryOTPVerification"
 
 // Mock data
 const stats = {
@@ -28,6 +29,8 @@ export default function DeliveryDashboard() {
   const [agentName, setAgentName] = useState<string>("")
   const [agentId, setAgentId] = useState<number | null>(null)
   const [stats, setStats] = useState<any>({ totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
+  const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null)
+  const [isTracking, setIsTracking] = useState(false)
 
   useEffect(() => {
       // Get delivery agent name and id from userInfo cookie
@@ -140,7 +143,84 @@ export default function DeliveryDashboard() {
     } catch {}
   }
 
-  // Function to update GPS location for all active deliveries
+  const handleStartDelivery = async (orderId: string) => {
+    if (!agentId) return
+    try {
+      const res = await fetch("/api/order/tracking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          orderId, 
+          deliveryAgentId: agentId, 
+          action: "start_delivery" 
+        })
+      })
+      if (res.ok) {
+        refreshOrders()
+        // Start GPS tracking if not already active
+        if (!isTracking) {
+          startTracking()
+        }
+      }
+    } catch (error) {
+      console.error("Error starting delivery:", error)
+    }
+  }
+
+  // Function to start GPS tracking
+  const startTracking = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus("Geolocation not supported");
+      return;
+    }
+    setIsTracking(true);
+    setLocationStatus("Starting GPS tracking...");
+    
+    const watchId = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const location = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setCurrentLocation(location);
+        setLocationStatus("GPS tracking active");
+        
+        // Update location for all active deliveries
+        if (agentId && activeDeliveries.length) {
+          for (const delivery of activeDeliveries) {
+            try {
+              await fetch("/api/order/tracking", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  orderId: delivery.id,
+                  deliveryAgentId: agentId,
+                  action: "update_location",
+                  location: location
+                })
+              });
+            } catch (error) {
+              console.error("Error updating location:", error);
+            }
+          }
+        }
+      },
+      (error) => {
+        setLocationStatus("GPS tracking failed");
+        setIsTracking(false);
+        console.error("GPS error:", error);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+    
+    // Store watch ID for cleanup
+    return () => navigator.geolocation.clearWatch(watchId);
+  };
+
+  // Function to stop GPS tracking
+  const stopTracking = () => {
+    setIsTracking(false);
+    setLocationStatus("GPS tracking stopped");
+  };
+
+  // Function to update GPS location for all active deliveries (legacy)
   const updateLocation = async () => {
     if (!agentId || !activeDeliveries.length) return;
     if (!navigator.geolocation) {
@@ -186,8 +266,49 @@ export default function DeliveryDashboard() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Welcome back, {agentName || "Delivery Agent"}!</h1>
-          <p className="text-gray-600">Ready to deliver happiness to customers</p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Welcome back, {agentName || "Delivery Agent"}!</h1>
+              <p className="text-gray-600">Ready to deliver happiness to customers</p>
+            </div>
+            
+            {/* GPS Tracking Controls */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Map className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium">GPS Tracking</span>
+              </div>
+              <div className="flex gap-2">
+                {!isTracking ? (
+                  <Button 
+                    onClick={startTracking} 
+                    size="sm" 
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Map className="h-4 w-4 mr-1" />
+                    Start Tracking
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={stopTracking} 
+                    size="sm" 
+                    variant="destructive"
+                  >
+                    <Map className="h-4 w-4 mr-1" />
+                    Stop Tracking
+                  </Button>
+                )}
+              </div>
+              {locationStatus && (
+                <p className="text-xs text-gray-500">{locationStatus}</p>
+              )}
+              {currentLocation && (
+                <p className="text-xs text-gray-500">
+                  Location: {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -440,12 +561,19 @@ export default function DeliveryDashboard() {
                       </div>
 
                       <div className="flex flex-col gap-2 mt-4 p-4 bg-white rounded-lg border">
-                        <Button onClick={() => handlePickupParcel(delivery.id)} className="mt-2 bg-orange-600 hover:bg-orange-700">
-                          <Package className="h-4 w-4 mr-2" />
-                          Pickup Parcel
-                        </Button>
-                        <p className="text-xs text-gray-500 text-center">Click to confirm parcel pickup from seller</p>
-                        </div>
+                        <DeliveryOTPVerification
+                          orderId={delivery.id}
+                          deliveryAgentId={agentId || 0}
+                          onSuccess={refreshOrders}
+                          trigger={
+                            <Button className="mt-2 bg-orange-600 hover:bg-orange-700 w-full">
+                              <Key className="h-4 w-4 mr-2" />
+                              Pickup Parcel with OTP
+                            </Button>
+                          }
+                        />
+                        <p className="text-xs text-gray-500 text-center">Generate OTP and verify with seller to confirm pickup</p>
+                      </div>
 
                       <div className="flex gap-2 mt-4">
                         <Button variant="outline" onClick={() => handleViewRoute(delivery.pickup, delivery.delivery)}>
@@ -467,7 +595,7 @@ export default function DeliveryDashboard() {
           <TabsContent value="active" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Active Deliveries</h2>
-              <Badge variant="default">{activeDeliveries.filter(d => d.status !== "READY_FOR_DELIVERY").length} active</Badge>
+              <Badge variant="default">{activeDeliveries.filter(d => d.status === "PICKED_UP" || d.status === "IN_TRANSIT").length} active</Badge>
             </div>
 
             {loading ? (
@@ -480,7 +608,7 @@ export default function DeliveryDashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {activeDeliveries.filter(delivery => delivery.status !== "READY_FOR_DELIVERY").map((delivery) => (
+                {activeDeliveries.filter(delivery => delivery.status === "PICKED_UP" || delivery.status === "IN_TRANSIT").map((delivery) => (
                   <Card key={delivery.id} className="border-blue-200 bg-blue-50">
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
@@ -488,7 +616,7 @@ export default function DeliveryDashboard() {
                           <h3 className="text-lg font-semibold">{delivery.id}</h3>
                           <p className="text-gray-600">{delivery.seller}</p>
                           <Badge variant="default" className="mt-1">
-                            {delivery.status === "picked_up" ? "Picked Up" : "In Transit"}
+                            {delivery.status === "PICKED_UP" ? "Picked Up" : "In Transit"}
                         </Badge>
                         </div>
                         <div className="text-right">
@@ -512,19 +640,30 @@ export default function DeliveryDashboard() {
                       </div>
 
                         <div className="flex gap-2">
-                        <Button onClick={() => handleCompleteDelivery(delivery.id)} className="flex-1">
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Complete Delivery
-                        </Button>
-                        <Button variant="outline" onClick={() => handleViewRoute(delivery.pickup, delivery.delivery)}>
-                          <Navigation className="h-4 w-4 mr-2" />
-                          Navigate
-                        </Button>
-                        <Button variant="outline" onClick={() => handleCallCustomer(delivery.customerPhone)}>
-                          <Phone className="h-4 w-4 mr-2" />
-                          Call Customer
+                          {delivery.status === "PICKED_UP" && (
+                            <Button 
+                              onClick={() => handleStartDelivery(delivery.id)} 
+                              className="flex-1 bg-blue-600 hover:bg-blue-700"
+                            >
+                              <Truck className="h-4 w-4 mr-2" />
+                              Start Delivery
+                            </Button>
+                          )}
+                          {delivery.status === "IN_TRANSIT" && (
+                            <Button onClick={() => handleCompleteDelivery(delivery.id)} className="flex-1">
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Complete Delivery
+                            </Button>
+                          )}
+                          <Button variant="outline" onClick={() => handleViewRoute(delivery.pickup, delivery.delivery)}>
+                            <Navigation className="h-4 w-4 mr-2" />
+                            Navigate
                           </Button>
-                      </div>
+                          <Button variant="outline" onClick={() => handleCallCustomer(delivery.customerPhone)}>
+                            <Phone className="h-4 w-4 mr-2" />
+                            Call Customer
+                          </Button>
+                        </div>
                     </CardContent>
                   </Card>
                 ))}

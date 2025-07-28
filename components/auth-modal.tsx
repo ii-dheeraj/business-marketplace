@@ -178,7 +178,12 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login", defaultUserT
           setOtpPhone(data.phone || loginFormData.phone);
           setSuccessMsg("OTP sent! Please check your phone (or console in dev mode).");
         } catch (error: any) {
-          setErrorMsg(error.message || "Failed to send OTP");
+          console.error('Login error:', error);
+          if (error.message === 'Failed to fetch') {
+            setErrorMsg("Network error: Please check your internet connection and try again. If the problem persists, the server may be down.");
+          } else {
+            setErrorMsg(error.message || "Failed to send OTP. Please try again.");
+          }
         } finally {
           setIsLoading(false);
         }
@@ -211,7 +216,9 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login", defaultUserT
             return;
           }
           setSuccessMsg(`Successfully logged in as ${data.user.userType}!`);
-          setCookie("userInfo", JSON.stringify(data.user));
+          // Exclude large fields from cookie to prevent truncation
+          const { businessImage, ...safeUser } = data.user;
+          setCookie("userInfo", JSON.stringify(safeUser));
           window.dispatchEvent(new CustomEvent('userLogin', { detail: data.user }));
           setOtpValue("");
           setOtpStep(null);
@@ -225,7 +232,12 @@ export function AuthModal({ isOpen, onClose, defaultMode = "login", defaultUserT
           }
           handleClose();
         } catch (error: any) {
-          setErrorMsg(error.message || "OTP verification failed");
+          console.error('OTP verification error:', error);
+          if (error.message === 'Failed to fetch') {
+            setErrorMsg("Network error: Please check your internet connection and try again.");
+          } else {
+            setErrorMsg(error.message || "OTP verification failed. Please try again.");
+          }
           setOtpValue("");
           setOtpStep(null);
           router.refresh();

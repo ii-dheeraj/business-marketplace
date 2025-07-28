@@ -1,226 +1,224 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { 
-  Package, 
-  MapPin, 
-  Phone, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle,
-  Smartphone,
-  Clock
-} from "lucide-react"
-
-interface OrderDetails {
-  id: number
-  orderNumber: string
-  orderStatus: string
-  customerName: string
-  customerPhone: string
-  customerAddress: string
-  deliveryAgentId: number
-  hasOTP: boolean
-}
+import { Label } from "@/components/ui/label"
+import { Package, Key, CheckCircle, XCircle, RefreshCw } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface DeliveryOTPVerificationProps {
-  order: OrderDetails
+  orderId: string
   deliveryAgentId: number
-  onVerificationSuccess: () => void
-  onVerificationError: (error: string) => void
+  onSuccess: () => void
+  trigger: React.ReactNode
 }
 
-export default function DeliveryOTPVerification({
-  order,
-  deliveryAgentId,
-  onVerificationSuccess,
-  onVerificationError
+export default function DeliveryOTPVerification({ 
+  orderId, 
+  deliveryAgentId, 
+  onSuccess, 
+  trigger 
 }: DeliveryOTPVerificationProps) {
+  const { toast } = useToast()
+  const [isOpen, setIsOpen] = useState(false)
   const [otp, setOtp] = useState("")
+  const [isGenerating, setIsGenerating] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
-  const [verificationStatus, setVerificationStatus] = useState<"idle" | "success" | "error">("idle")
-  const [errorMessage, setErrorMessage] = useState("")
+  const [generatedOtp, setGeneratedOtp] = useState("")
 
-  const handleOTPChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "").slice(0, 6) // Only allow 6 digits
-    setOtp(value)
-    if (verificationStatus !== "idle") {
-      setVerificationStatus("idle")
-      setErrorMessage("")
-    }
-  }
-
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
-      setErrorMessage("Please enter a 6-digit OTP")
-      return
-    }
-
-    setIsVerifying(true)
-    setVerificationStatus("idle")
-    setErrorMessage("")
-
+  const generateOTP = async () => {
+    setIsGenerating(true)
     try {
-      const response = await fetch("/api/order/verify-otp", {
+      const response = await fetch("/api/order/generate-otp", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderId: order.id,
-          otp: otp,
-          deliveryAgentId: deliveryAgentId
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, deliveryAgentId })
       })
 
       const data = await response.json()
 
-      if (response.ok) {
-        setVerificationStatus("success")
-        onVerificationSuccess()
+      if (response.ok && data.success) {
+        setGeneratedOtp(data.otp)
+        toast({
+          title: "Success",
+          description: "OTP generated successfully! Share this with the seller.",
+        })
       } else {
-        setVerificationStatus("error")
-        setErrorMessage(data.error || "Failed to verify OTP")
-        onVerificationError(data.error || "Failed to verify OTP")
+        toast({
+          title: "Error",
+          description: data.error || "Failed to generate OTP",
+          variant: "destructive",
+        })
       }
     } catch (error) {
-      setVerificationStatus("error")
-      const errorMsg = "Network error. Please try again."
-      setErrorMessage(errorMsg)
-      onVerificationError(errorMsg)
+      console.error("Error generating OTP:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate OTP",
+        variant: "destructive",
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const verifyOTP = async () => {
+    if (!otp.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter the OTP",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsVerifying(true)
+    try {
+      const response = await fetch("/api/order/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, deliveryAgentId, otp: otp.trim() })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        toast({
+          title: "Success",
+          description: "OTP verified successfully! Parcel picked up.",
+        })
+        setIsOpen(false)
+        setOtp("")
+        setGeneratedOtp("")
+        onSuccess()
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Invalid OTP",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error verifying OTP:", error)
+      toast({
+        title: "Error",
+        description: "Failed to verify OTP",
+        variant: "destructive",
+      })
     } finally {
       setIsVerifying(false)
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "OUT_FOR_DELIVERY":
-        return "bg-blue-100 text-blue-800"
-      case "DELIVERED":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open)
+    if (!open) {
+      setOtp("")
+      setGeneratedOtp("")
     }
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Package className="h-5 w-5" />
-          Delivery Verification
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Order Details */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-gray-900">Order #{order.orderNumber}</p>
-              <p className="text-sm text-gray-600">ID: {order.id}</p>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        {trigger}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-orange-600" />
+            Parcel Pickup Verification
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* OTP Generation Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Generate OTP for Seller</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={generateOTP}
+                disabled={isGenerating}
+                className="flex items-center gap-2"
+              >
+                {isGenerating ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Key className="h-4 w-4" />
+                )}
+                {isGenerating ? "Generating..." : "Generate OTP"}
+              </Button>
             </div>
-            <Badge className={getStatusColor(order.orderStatus)}>
-              {order.orderStatus}
-            </Badge>
+
+            {generatedOtp && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-800">OTP Generated</span>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600 tracking-wider mb-2">
+                    {generatedOtp}
+                  </div>
+                  <p className="text-xs text-green-700">
+                    Share this OTP with the seller to verify parcel pickup
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
-          <Separator />
-
-          {/* Customer Details */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-blue-600" />
-              <span className="font-medium text-gray-900">{order.customerName}</span>
+          {/* OTP Verification Section */}
+          <div className="space-y-4">
+            <Label htmlFor="otp" className="text-sm font-medium">
+              Enter OTP from Seller
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="otp"
+                type="text"
+                placeholder="Enter 6-digit OTP"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                maxLength={6}
+                className="text-center text-lg font-mono tracking-wider"
+              />
+              <Button
+                onClick={verifyOTP}
+                disabled={isVerifying || !otp.trim()}
+                className="flex items-center gap-2"
+              >
+                {isVerifying ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
+                {isVerifying ? "Verifying..." : "Verify"}
+              </Button>
             </div>
-            <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-gray-600">{order.customerPhone}</span>
+          </div>
+
+          {/* Instructions */}
+          <div className="text-xs text-gray-600 space-y-2">
+            <div className="flex items-start gap-2">
+              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5 flex-shrink-0"></div>
+              <p>Click "Generate OTP" to create a verification code</p>
             </div>
             <div className="flex items-start gap-2">
-              <MapPin className="h-4 w-4 text-red-600 mt-0.5" />
-              <span className="text-sm text-gray-600">{order.customerAddress}</span>
+              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5 flex-shrink-0"></div>
+              <p>Share the OTP with the seller when you arrive</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5 flex-shrink-0"></div>
+              <p>Enter the OTP provided by the seller to confirm pickup</p>
             </div>
           </div>
         </div>
-
-        <Separator />
-
-        {/* OTP Verification */}
-        <div className="space-y-4">
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Smartphone className="h-5 w-5 text-blue-600" />
-              <h3 className="font-semibold text-gray-900">Enter Delivery OTP</h3>
-            </div>
-            <p className="text-sm text-gray-600 mb-4">
-              Ask the customer for their 6-digit delivery OTP
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <Input
-              type="text"
-              placeholder="Enter 6-digit OTP"
-              value={otp}
-              onChange={handleOTPChange}
-              className="text-center text-lg font-mono tracking-widest"
-              maxLength={6}
-              disabled={isVerifying}
-            />
-
-            {errorMessage && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <XCircle className="h-4 w-4 text-red-600" />
-                <span className="text-sm text-red-700">{errorMessage}</span>
-              </div>
-            )}
-
-            {verificationStatus === "success" && (
-              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-sm text-green-700">OTP verified successfully!</span>
-              </div>
-            )}
-
-            <Button
-              onClick={handleVerifyOTP}
-              disabled={otp.length !== 6 || isVerifying}
-              className="w-full"
-            >
-              {isVerifying ? (
-                <>
-                  <Clock className="h-4 w-4 mr-2 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                "Verify OTP & Complete Delivery"
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Instructions */}
-        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="font-medium text-blue-800 text-sm">Instructions</p>
-              <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                <li>• Ask customer for their delivery OTP</li>
-                <li>• Enter the 6-digit code above</li>
-                <li>• Verify and complete delivery</li>
-                <li>• Order will be marked as delivered</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   )
 } 

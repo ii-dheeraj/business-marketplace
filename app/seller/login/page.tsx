@@ -66,9 +66,13 @@ export default function SellerLogin() {
         setIsLoading(false)
         return
       }
-      setCookie("userInfo", JSON.stringify(data.user))
+      // Exclude large fields from cookie to prevent truncation
+      const { businessImage, ...safeUser } = data.user;
+      setCookie("userInfo", JSON.stringify(safeUser))
       if (data.user.userType === "seller") {
-        router.push("/seller/dashboard")
+        setTimeout(() => {
+          router.push("/seller/dashboard")
+        }, 100);
       } else {
         setError("Not a seller account")
       }
