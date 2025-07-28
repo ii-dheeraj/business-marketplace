@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Separator } from "@/components/ui/separator"
+import OrderDetailsModal from "@/components/order-details-modal"
 
 import {
   Package,
@@ -38,10 +38,6 @@ import {
   Save,
   Navigation,
   Users,
-  X,
-  Truck,
-  CreditCard,
-  Receipt,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -49,6 +45,7 @@ import Image from "next/image"
 import { getCookie, deleteCookie } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast";
 import { indianStates, indianStateCityMap } from "@/utils/indian-location-data";
+
 
 
 
@@ -70,15 +67,10 @@ export default function SellerDashboard() {
   const { toast } = useToast();
   const [profileForm, setProfileForm] = useState<any>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  
-  // Order Details Modal State
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [orderDetails, setOrderDetails] = useState<any>(null);
-  const [isLoadingOrderDetails, setIsLoadingOrderDetails] = useState(false);
-  const [otpInput, setOtpInput] = useState("");
-  const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
-  const [otpStatus, setOtpStatus] = useState<"idle" | "success" | "error">("idle");
-  const [otpMessage, setOtpMessage] = useState("");
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [loadingOrderId, setLoadingOrderId] = useState<number | null>(null);
+
 
 
 
@@ -125,91 +117,6 @@ export default function SellerDashboard() {
       setIsSavingProfile(false);
     }
   };
-
-  // Order Details Modal Functions
-  const handleViewOrderDetails = async (order: any) => {
-    setSelectedOrder(order);
-    setOrderDetails(null);
-    setOtpInput("");
-    setOtpStatus("idle");
-    setOtpMessage("");
-    setIsLoadingOrderDetails(true);
-    
-    try {
-      const res = await fetch(`/api/seller/order-details?orderId=${order.orderId}&sellerId=${sellerInfo.id}`);
-      const data = await res.json();
-      
-      if (res.ok && data.success) {
-        setOrderDetails(data.orderDetails);
-      } else {
-        toast({ title: "Failed to load order details", description: data.error || "Unknown error", variant: "destructive" });
-      }
-    } catch (error) {
-      console.error("Error fetching order details:", error);
-      toast({ title: "Failed to load order details", description: String(error), variant: "destructive" });
-    } finally {
-      setIsLoadingOrderDetails(false);
-    }
-  };
-
-  const handleSubmitOtp = async () => {
-    if (!otpInput.trim() || !selectedOrder) return;
-    
-    setIsSubmittingOtp(true);
-    setOtpStatus("idle");
-    setOtpMessage("");
-    
-    try {
-      const res = await fetch("/api/order/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: selectedOrder.orderId,
-          otp: otpInput.trim()
-        }),
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok && data.success) {
-        setOtpStatus("success");
-        setOtpMessage("OTP verified successfully! Order status updated.");
-        setOtpInput("");
-        // Refresh order details
-        if (orderDetails) {
-          setOrderDetails({
-            ...orderDetails,
-            order: {
-              ...orderDetails.order,
-              orderStatus: "PICKED_UP"
-            }
-          });
-        }
-        // Refresh orders list
-        fetchOrders(currentPage);
-        toast({ title: "OTP verified successfully!" });
-      } else {
-        setOtpStatus("error");
-        setOtpMessage(data.error || "Invalid OTP. Please try again.");
-      }
-    } catch (error) {
-      console.error("Error verifying OTP:", error);
-      setOtpStatus("error");
-      setOtpMessage("Failed to verify OTP. Please try again.");
-    } finally {
-      setIsSubmittingOtp(false);
-    }
-  };
-
-  const closeOrderModal = () => {
-    setSelectedOrder(null);
-    setOrderDetails(null);
-    setOtpInput("");
-    setOtpStatus("idle");
-    setOtpMessage("");
-  };
-
-
 
   // Optimized data fetching with loading states
   const fetchProducts = async (page = 1) => {
@@ -449,6 +356,46 @@ export default function SellerDashboard() {
       toast({ title: "Failed to delete product", description: String(error), variant: "destructive" })
     }
   }
+
+  const handleViewOrderDetails = async (order: any) => {
+    setLoadingOrderId(order.id);
+    try {
+      const response = await fetch(`/api/seller/order-details?orderId=${order.orderId}&sellerId=${sellerInfo.id}`)
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        setSelectedOrder(data.order)
+        setIsOrderModalOpen(true)
+      } else {
+        toast({ 
+          title: "Error", 
+          description: data.error || "Failed to fetch order details", 
+          variant: "destructive" 
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching order details:", error)
+      toast({ 
+        title: "Error", 
+        description: "Failed to fetch order details", 
+        variant: "destructive" 
+      })
+    } finally {
+      setLoadingOrderId(null);
+    }
+  }
+
+  const handleOrderModalClose = () => {
+    setIsOrderModalOpen(false)
+    setSelectedOrder(null)
+  }
+
+  const handleOrderUpdate = () => {
+    // Refresh orders after OTP verification
+    fetchOrders(currentPage)
+  }
+
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -894,17 +841,15 @@ export default function SellerDashboard() {
                         <div className="text-right">
                           <p className="text-lg font-bold">Order ID: {order.id}</p>
                           <p className="text-sm text-gray-600 mb-2">Seller Order</p>
-                          <div className="flex flex-col gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="bg-transparent"
-                              onClick={() => handleViewOrderDetails(order)}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View Details
-                            </Button>
-                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-2 bg-transparent hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                            onClick={() => handleViewOrderDetails(order)}
+                            disabled={loadingOrderId === order.id}
+                          >
+                            {loadingOrderId === order.id ? "Loading..." : "View Details"}
+                          </Button>
                         </div>
                       </div>
                     </CardContent>
@@ -914,8 +859,6 @@ export default function SellerDashboard() {
             </div>
 
           </TabsContent>
-
-
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6">
@@ -1201,303 +1144,13 @@ export default function SellerDashboard() {
       )}
 
       {/* Order Details Modal */}
-      <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && closeOrderModal()}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-0">
-          <DialogHeader className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle className="text-xl font-bold text-gray-900">
-                  Order Details
-                </DialogTitle>
-                <DialogDescription className="text-gray-600">
-                  Complete order information and OTP verification
-                </DialogDescription>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={closeOrderModal}
-                className="h-8 w-8 p-0 hover:bg-gray-200 rounded-full"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </DialogHeader>
-
-          {isLoadingOrderDetails ? (
-            <div className="flex items-center justify-center py-12 px-6">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading order details...</p>
-              </div>
-            </div>
-          ) : orderDetails ? (
-            <div className="space-y-6 px-6 py-4">
-
-              {/* Order Header */}
-              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-                <CardContent className="p-6">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">
-                        Order #{orderDetails.order.orderNumber || orderDetails.order.id}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Placed on {new Date(orderDetails.order.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Badge className={`text-sm px-3 py-1 ${
-                      orderDetails.order.orderStatus === 'DELIVERED' ? 'bg-green-100 text-green-800' :
-                      orderDetails.order.orderStatus === 'CANCELLED' ? 'bg-red-100 text-red-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {orderDetails.order.orderStatus.replace(/_/g, ' ')}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Customer Information */}
-                <Card className="shadow-sm border-gray-200">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <User className="h-5 w-5 text-blue-600" />
-                      Customer Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-500" />
-                      <span className="font-medium">{orderDetails.order.customerName}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-gray-500" />
-                      <span>{orderDetails.order.customerPhone}</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
-                      <div className="text-sm">
-                        <p className="font-medium">Delivery Address:</p>
-                        <p>{orderDetails.order.customerAddress}</p>
-                        <p>{orderDetails.order.customerArea}, {orderDetails.order.customerLocality}</p>
-                        <p>{orderDetails.order.customerCity}</p>
-                      </div>
-                    </div>
-                    {orderDetails.order.deliveryInstructions && (
-                      <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                        <p className="text-sm font-medium text-yellow-800">Delivery Instructions:</p>
-                        <p className="text-sm text-yellow-700">{orderDetails.order.deliveryInstructions}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Payment Information */}
-                <Card className="shadow-sm border-gray-200">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <CreditCard className="h-5 w-5 text-green-600" />
-                      Payment Details
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Subtotal:</span>
-                      <span className="font-medium">₹{orderDetails.payment.subtotal?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Delivery Fee:</span>
-                      <span className="font-medium">₹{orderDetails.payment.deliveryFee?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Tax:</span>
-                      <span className="font-medium">₹{orderDetails.payment.taxAmount?.toLocaleString()}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Total Amount:</span>
-                      <span className="text-green-600">₹{orderDetails.payment.totalAmount?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Payment Method:</span>
-                      <span className="font-medium">{orderDetails.payment.paymentMethod?.replace(/_/g, ' ')}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Payment Status:</span>
-                      <Badge className={
-                        orderDetails.payment.paymentStatus === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                        orderDetails.payment.paymentStatus === 'FAILED' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }>
-                        {orderDetails.payment.paymentStatus}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Order Items */}
-              <Card className="shadow-sm border-gray-200">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Package className="h-5 w-5 text-purple-600" />
-                    Order Items
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {orderDetails.items.map((item: any, index: number) => (
-                      <div key={item.id || index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                        <div className="w-16 h-16 bg-white rounded-lg overflow-hidden flex-shrink-0">
-                          <Image
-                            src={item.productImage || item.product?.image || "/placeholder.svg"}
-                            alt={item.productName}
-                            width={64}
-                            height={64}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900 truncate">{item.productName}</h4>
-                          <p className="text-sm text-gray-600">{item.productCategory}</p>
-                          <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium">₹{item.unitPrice?.toLocaleString()}</p>
-                          <p className="text-sm text-gray-600">per unit</p>
-                          <p className="font-bold text-lg">₹{item.totalPrice?.toLocaleString()}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Seller Order Summary */}
-              <Card className="shadow-sm border-gray-200 bg-blue-50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Receipt className="h-5 w-5 text-blue-600" />
-                    Your Order Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Your Subtotal:</span>
-                    <span className="font-medium">₹{orderDetails.sellerOrder.subtotal?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Platform Commission:</span>
-                    <span className="font-medium text-red-600">-₹{orderDetails.sellerOrder.commission?.toLocaleString()}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Your Net Amount:</span>
-                    <span className="text-green-600">₹{orderDetails.sellerOrder.netAmount?.toLocaleString()}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* OTP Verification Section */}
-              <Card className="shadow-lg border-2 border-orange-300 bg-gradient-to-r from-orange-50 to-yellow-50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2 text-orange-800">
-                    <Truck className="h-5 w-5 text-orange-600" />
-                    Delivery Agent Pickup Verification
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="bg-white p-6 rounded-xl border-2 border-orange-200 shadow-md">
-                    <p className="text-sm text-gray-700 mb-4 font-medium">
-                      A delivery agent will arrive to pick up this order. Please verify their OTP to confirm pickup.
-                    </p>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="otp-input" className="text-sm font-semibold text-gray-800 block mb-2">
-                          Enter OTP to proceed
-                        </Label>
-                        <Input
-                          id="otp-input"
-                          type="text"
-                          placeholder="Enter OTP to proceed"
-                          value={otpInput}
-                          onChange={(e) => setOtpInput(e.target.value)}
-                          className="mt-1 h-12 text-lg font-mono text-center tracking-widest border-2 border-orange-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 rounded-lg"
-                          maxLength={6}
-                        />
-                      </div>
-                        
-                        {otpStatus === "success" && (
-                          <div className="p-3 bg-green-100 border border-green-200 rounded-lg">
-                            <p className="text-sm text-green-800 font-medium">{otpMessage}</p>
-                          </div>
-                        )}
-                        
-                        {otpStatus === "error" && (
-                          <div className="p-3 bg-red-100 border border-red-200 rounded-lg">
-                            <p className="text-sm text-red-800 font-medium">{otpMessage}</p>
-                          </div>
-                        )}
-                        
-                        <div className="flex gap-3">
-                          <Button
-                            onClick={handleSubmitOtp}
-                            disabled={!otpInput.trim() || isSubmittingOtp}
-                            className="flex-1 h-12 text-lg font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                          >
-                            {isSubmittingOtp ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                Verifying...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Submit OTP
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-              {/* Delivery Agent Information */}
-              {orderDetails.deliveryAgent && (
-                <Card className="shadow-sm border-gray-200">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Truck className="h-5 w-5 text-blue-600" />
-                      Delivery Agent
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-500" />
-                      <span className="font-medium">{orderDetails.deliveryAgent.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-gray-500" />
-                      <span>{orderDetails.deliveryAgent.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Truck className="h-4 w-4 text-gray-500" />
-                      <span>{orderDetails.deliveryAgent.vehicleType} - {orderDetails.deliveryAgent.vehicleNumber}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-12 px-6">
-              <p className="text-gray-600">Failed to load order details</p>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <OrderDetailsModal
+        isOpen={isOrderModalOpen}
+        onClose={handleOrderModalClose}
+        order={selectedOrder}
+        onOrderUpdate={handleOrderUpdate}
+        isLoading={loadingOrderId !== null}
+      />
 
     </div>
   )
