@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import OrderDetailsModal from "@/components/order-details-modal"
 
 import {
   Package,
@@ -48,6 +49,7 @@ import { indianStates, indianStateCityMap } from "@/utils/indian-location-data";
 
 
 
+
 export default function SellerDashboard() {
   const [sellerInfo, setSellerInfo] = useState<any>(null)
   const [activeTab, setActiveTab] = useState("products")
@@ -65,6 +67,10 @@ export default function SellerDashboard() {
   const { toast } = useToast();
   const [profileForm, setProfileForm] = useState<any>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [loadingOrderId, setLoadingOrderId] = useState<number | null>(null);
+
 
 
 
@@ -350,6 +356,46 @@ export default function SellerDashboard() {
       toast({ title: "Failed to delete product", description: String(error), variant: "destructive" })
     }
   }
+
+  const handleViewOrderDetails = async (order: any) => {
+    setLoadingOrderId(order.id);
+    try {
+      const response = await fetch(`/api/seller/order-details?orderId=${order.orderId}&sellerId=${sellerInfo.id}`)
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        setSelectedOrder(data.order)
+        setIsOrderModalOpen(true)
+      } else {
+        toast({ 
+          title: "Error", 
+          description: data.error || "Failed to fetch order details", 
+          variant: "destructive" 
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching order details:", error)
+      toast({ 
+        title: "Error", 
+        description: "Failed to fetch order details", 
+        variant: "destructive" 
+      })
+    } finally {
+      setLoadingOrderId(null);
+    }
+  }
+
+  const handleOrderModalClose = () => {
+    setIsOrderModalOpen(false)
+    setSelectedOrder(null)
+  }
+
+  const handleOrderUpdate = () => {
+    // Refresh orders after OTP verification
+    fetchOrders(currentPage)
+  }
+
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -795,8 +841,14 @@ export default function SellerDashboard() {
                         <div className="text-right">
                           <p className="text-lg font-bold">Order ID: {order.id}</p>
                           <p className="text-sm text-gray-600 mb-2">Seller Order</p>
-                          <Button variant="outline" size="sm" className="mt-2 bg-transparent">
-                            View Details
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-2 bg-transparent hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                            onClick={() => handleViewOrderDetails(order)}
+                            disabled={loadingOrderId === order.id}
+                          >
+                            {loadingOrderId === order.id ? "Loading..." : "View Details"}
                           </Button>
                         </div>
                       </div>
@@ -1091,6 +1143,14 @@ export default function SellerDashboard() {
         </div>
       )}
 
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        isOpen={isOrderModalOpen}
+        onClose={handleOrderModalClose}
+        order={selectedOrder}
+        onOrderUpdate={handleOrderUpdate}
+        isLoading={loadingOrderId !== null}
+      />
 
     </div>
   )
