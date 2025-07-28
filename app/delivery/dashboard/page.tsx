@@ -5,9 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Label } from "@/components/ui/label"
 import { Package, MapPin, Clock, DollarSign, Navigation, Phone, CheckCircle, User, Key, Map, Truck } from "lucide-react"
 import { getCookie } from "@/lib/utils"
-import DeliveryOTPVerification from "@/components/DeliveryOTPVerification"
 
 // Mock data
 const stats = {
@@ -31,6 +31,7 @@ export default function DeliveryDashboard() {
   const [stats, setStats] = useState<any>({ totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null)
   const [isTracking, setIsTracking] = useState(false)
+  const [otpGeneratedOrders, setOtpGeneratedOrders] = useState<{[key: string]: string}>({})
 
   useEffect(() => {
       // Get delivery agent name and id from userInfo cookie
@@ -56,6 +57,31 @@ export default function DeliveryDashboard() {
             setAvailableOrders(data.availableOrders || [])
             setActiveDeliveries(data.activeDeliveries || [])
             setStats(data.stats || { totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
+            
+            // Check for existing OTPs for ready-for-pickup orders
+            const readyForPickupOrders = data.activeDeliveries?.filter((d: any) => d.status === "READY_FOR_DELIVERY") || []
+            for (const order of readyForPickupOrders) {
+              try {
+                const otpResponse = await fetch("/api/order/generate-otp", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ 
+                    orderId: order.id, 
+                    deliveryAgentId: deliveryAgentId || 0,
+                    checkOnly: true 
+                  })
+                })
+                const otpData = await otpResponse.json()
+                if (otpResponse.ok && otpData.success && otpData.otp) {
+                  setOtpGeneratedOrders(prev => ({
+                    ...prev,
+                    [order.id]: otpData.otp
+                  }))
+                }
+              } catch (error) {
+                console.error("Error checking OTP for order:", order.id, error)
+              }
+            }
           } else {
             setError(data.error || "Failed to fetch orders")
           }
@@ -561,18 +587,69 @@ export default function DeliveryDashboard() {
                       </div>
 
                       <div className="flex flex-col gap-2 mt-4 p-4 bg-white rounded-lg border">
-                        <DeliveryOTPVerification
-                          orderId={delivery.id}
-                          deliveryAgentId={agentId || 0}
-                          onSuccess={refreshOrders}
-                          trigger={
-                            <Button className="mt-2 bg-orange-600 hover:bg-orange-700 w-full">
-                              <Key className="h-4 w-4 mr-2" />
-                              Pickup Parcel with OTP
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-medium">OTP for Seller</Label>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch("/api/order/generate-otp", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ 
+                                      orderId: delivery.id, 
+                                      deliveryAgentId: agentId || 0 
+                                    })
+                                  })
+
+                                  const data = await response.json()
+
+                                  if (response.ok && data.success) {
+                                    // Store the OTP (either existing or newly generated)
+                                    setOtpGeneratedOrders(prev => ({
+                                      ...prev,
+                                      [delivery.id]: data.otp
+                                    }))
+                                  } else {
+                                    console.error("Failed to get OTP:", data.error)
+                                  }
+                                } catch (error) {
+                                  console.error("Error getting OTP:", error)
+                                }
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Key className="h-4 w-4" />
+                              {otpGeneratedOrders[delivery.id] ? "Show OTP" : "Get OTP"}
                             </Button>
-                          }
-                        />
-                        <p className="text-xs text-gray-500 text-center">Generate OTP and verify with seller to confirm pickup</p>
+                          </div>
+
+                          {otpGeneratedOrders[delivery.id] && (
+                            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <span className="text-sm font-medium text-green-800">OTP Available</span>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-green-600 tracking-wider mb-2">
+                                  {otpGeneratedOrders[delivery.id]}
+                                </div>
+                                <p className="text-xs text-green-700">
+                                  Share this OTP with the seller to verify parcel pickup
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          <p className="text-xs text-gray-500 text-center">
+                            {otpGeneratedOrders[delivery.id]
+                              ? "OTP is static and remains the same for this order" 
+                              : "Get OTP and share with seller when you arrive"
+                            }
+                          </p>
+                        </div>
                       </div>
 
                       <div className="flex gap-2 mt-4">

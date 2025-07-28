@@ -4,13 +4,43 @@ import { supabase } from "@/lib/database";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, deliveryAgentId } = body;
+    const { orderId, deliveryAgentId, checkOnly } = body;
 
     if (!orderId || !deliveryAgentId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Generate a 6-digit OTP
+    // First, check if an OTP already exists for this order
+    const { data: existingOrder, error: fetchError } = await supabase
+      .from("orders")
+      .select("parcel_otp")
+      .eq("id", Number(orderId))
+      .single();
+
+    if (fetchError) {
+      console.error("Error fetching existing order:", fetchError);
+      return NextResponse.json({ error: "Failed to fetch order" }, { status: 500 });
+    }
+
+    // If OTP already exists, return it (static OTP)
+    if (existingOrder.parcel_otp) {
+      return NextResponse.json({ 
+        success: true, 
+        otp: existingOrder.parcel_otp,
+        message: "Existing OTP retrieved",
+        isExisting: true
+      });
+    }
+
+    // If checkOnly is true and no OTP exists, return without generating
+    if (checkOnly) {
+      return NextResponse.json({ 
+        success: false, 
+        message: "No OTP exists for this order"
+      });
+    }
+
+    // Generate a 6-digit OTP only if one doesn't exist
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Update the order with the generated OTP
@@ -42,7 +72,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       otp: otp,
-      message: "OTP generated successfully for parcel pickup"
+      message: "OTP generated successfully for parcel pickup",
+      isExisting: false
     });
 
   } catch (error) {
