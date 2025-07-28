@@ -159,9 +159,9 @@ export async function PATCH(request: NextRequest) {
 
     let updateData: any = { deliveryAgentId: Number(deliveryAgentId) };
     if (action === "accept") {
-      updateData.orderStatus = "READY_FOR_PICKUP";
+      updateData.orderStatus = "READY_FOR_DELIVERY"; // Using existing status until DB is updated
     } else if (action === "picked_up") {
-      updateData.orderStatus = "IN_TRANSIT";
+      updateData.orderStatus = "OUT_FOR_DELIVERY"; // Using existing status until DB is updated
     } else if (action === "delivered") {
       updateData.orderStatus = "DELIVERED";
       updateData.actualDeliveryTime = new Date();

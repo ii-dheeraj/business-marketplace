@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Package, MapPin, Clock, DollarSign, Navigation, Phone, CheckCircle } from "lucide-react"
+import { Package, MapPin, Clock, DollarSign, Navigation, Phone, CheckCircle, User } from "lucide-react"
 import { getCookie } from "@/lib/utils"
 
 // Mock data
@@ -318,7 +318,7 @@ export default function DeliveryDashboard() {
           <TabsContent value="pickup" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Ready for Pickup</h2>
-              <Badge variant="default">{activeDeliveries.filter(d => d.status === "READY_FOR_PICKUP").length} ready</Badge>
+              <Badge variant="default">{activeDeliveries.filter(d => d.status === "READY_FOR_DELIVERY").length} ready</Badge>
             </div>
 
             {loading ? (
@@ -331,7 +331,7 @@ export default function DeliveryDashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {activeDeliveries.filter(delivery => delivery.status === "READY_FOR_PICKUP").map((delivery) => (
+                {activeDeliveries.filter(delivery => delivery.status === "READY_FOR_DELIVERY").map((delivery) => (
                   <Card key={delivery.id} className="border-orange-200 bg-orange-50">
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
@@ -367,6 +367,28 @@ export default function DeliveryDashboard() {
                         <div className="mt-2">
                           <p className="text-sm font-medium text-gray-700">Seller Address:</p>
                           <p className="text-sm text-gray-600">{delivery.sellerAddress}</p>
+                        </div>
+                      </div>
+
+                      {/* Customer Information */}
+                      <div className="mb-4 p-4 bg-white rounded-lg border">
+                        <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                          <User className="h-4 w-4 text-green-600" />
+                          Customer Information
+                        </h4>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Customer Name:</p>
+                            <p className="text-sm text-gray-600">{delivery.customer}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Customer Phone:</p>
+                            <p className="text-sm text-gray-600">{delivery.customerPhone}</p>
+                          </div>
+                        </div>
+                        <div className="mt-2">
+                          <p className="text-sm font-medium text-gray-700">Delivery Address:</p>
+                          <p className="text-sm text-gray-600">{delivery.delivery}</p>
                         </div>
                       </div>
 
@@ -445,7 +467,7 @@ export default function DeliveryDashboard() {
           <TabsContent value="active" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Active Deliveries</h2>
-              <Badge variant="default">{activeDeliveries.filter(d => d.status !== "READY_FOR_PICKUP").length} active</Badge>
+              <Badge variant="default">{activeDeliveries.filter(d => d.status !== "READY_FOR_DELIVERY").length} active</Badge>
             </div>
 
             {loading ? (
@@ -458,7 +480,7 @@ export default function DeliveryDashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {activeDeliveries.filter(delivery => delivery.status !== "READY_FOR_PICKUP").map((delivery) => (
+                {activeDeliveries.filter(delivery => delivery.status !== "READY_FOR_DELIVERY").map((delivery) => (
                   <Card key={delivery.id} className="border-blue-200 bg-blue-50">
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">

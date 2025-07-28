@@ -29,6 +29,7 @@ import { useCart } from "@/hooks/useCart"
 import { useLocation } from "@/hooks/useLocation"
 import { Footer } from "@/components/ui/footer"
 import { getCookie, deleteCookie } from "@/lib/utils"
+import { SellerProfileCard } from "@/components/seller-profile-card"
 
 // Location data
 const locationData = {
@@ -86,6 +87,7 @@ export default function CustomerHomePage() {
   const [isLoadingContent, setIsLoadingContent] = useState(false)
   const [customerInfo, setCustomerInfo] = useState<any>(null)
   const [businesses, setBusinesses] = useState<any[]>([])
+  const [sellerProfiles, setSellerProfiles] = useState<any[]>([])
   const router = useRouter()
   const { addToCart, getItemQuantity } = useCart()
   const { location, setCity, setArea, setLocality, clearLocation, getLocationDisplay } = useLocation()
@@ -98,6 +100,20 @@ export default function CustomerHomePage() {
       setBusinesses(data.businesses || [])
     }
     fetchBusinesses()
+  }, [])
+
+  // Fetch seller profiles from backend
+  useEffect(() => {
+    const fetchSellerProfiles = async () => {
+      try {
+        const res = await fetch("/api/seller/profiles?featured=true&limit=6")
+        const data = await res.json()
+        setSellerProfiles(data.sellers || [])
+      } catch (error) {
+        console.error("Failed to fetch seller profiles:", error)
+      }
+    }
+    fetchSellerProfiles()
   }, [])
 
   // Check customer authentication
@@ -466,8 +482,42 @@ export default function CustomerHomePage() {
         </div>
       </section>
 
-      {/* Features */}
+      {/* Featured Seller Profiles */}
       <section className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <h2 className="text-3xl font-bold mb-2">Featured Sellers</h2>
+              <p className="text-gray-600">Discover top-rated local businesses and their profiles</p>
+            </div>
+            <Link href="/browse">
+              <Button variant="outline">View All Sellers</Button>
+            </Link>
+          </div>
+
+          {sellerProfiles.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sellerProfiles.map((seller) => (
+                <SellerProfileCard
+                  key={seller.id}
+                  seller={seller}
+                  showDetails={true}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-500 mb-4">No featured sellers available at the moment</p>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Refresh
+              </Button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center mb-12">Why Choose LocalMarket?</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">

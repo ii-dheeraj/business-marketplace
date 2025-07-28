@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { SellerProfileCard } from "@/components/seller-profile-card"
 import {
   MapPin,
   Clock,
@@ -115,27 +116,12 @@ export default function BusinessPage() {
         </div>
 
         {/* Business Header */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex flex-col md:flex-row md:items-center md:gap-6">
-          <img
-            src={business.image || "/placeholder.svg"}
-            alt={business.name}
-            className="w-28 h-28 object-cover rounded-lg mb-4 md:mb-0 md:mr-6 border"
+        <div className="mb-6">
+          <SellerProfileCard
+            seller={business}
+            showDetails={true}
+            className="w-full"
           />
-          <div className="flex-1 flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-gray-900">{business.name}</h1>
-              <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium text-gray-700">{business.categoryName}</span>
-              {business.subcategory && (
-                <span className="px-2 py-1 bg-gray-50 rounded text-xs font-medium text-gray-500">{business.subcategory}</span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-4 text-sm text-gray-700">
-              <div><span className="font-semibold">State:</span> {business.state || '-'}</div>
-              <div><span className="font-semibold">City:</span> {business.city || '-'}</div>
-              <div><span className="font-semibold">Phone:</span> {business.phone || '-'}</div>
-              {business.email && <div><span className="font-semibold">Email:</span> {business.email}</div>}
-            </div>
-          </div>
         </div>
 
         {/* Products Section */}

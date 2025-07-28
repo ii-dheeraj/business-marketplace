@@ -151,6 +151,8 @@ export default function SellerDashboard() {
 
 
 
+  // No longer needed since we're using data URLs instead of blob URLs
+
   useEffect(() => {
     const checkAuth = () => {
       const userInfoCookie = getCookie("userInfo")
@@ -929,9 +931,27 @@ export default function SellerDashboard() {
                       <Input id="profile-businessImage" type="file" accept="image/*" onChange={async e => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          // Simulate upload: use a local URL for now
-                          const url = URL.createObjectURL(file);
-                          handleProfileInputChange("businessImage", url);
+                          // Validate file type
+                          if (!file.type.startsWith("image/")) {
+                            alert("Please select only image files");
+                            return;
+                          }
+                          // Validate file size (max 5MB)
+                          if (file.size > 5 * 1024 * 1024) {
+                            alert("Image size should be less than 5MB");
+                            return;
+                          }
+                          // Use FileReader to create data URL instead of blob URL
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            if (event.target?.result) {
+                              handleProfileInputChange("businessImage", event.target.result as string);
+                            }
+                          };
+                          reader.onerror = () => {
+                            alert("Error reading file. Please try again.");
+                          };
+                          reader.readAsDataURL(file);
                         }
                       }} />
                       {profileForm.businessImage && (
