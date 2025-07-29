@@ -147,9 +147,24 @@ export default function SellerDashboard() {
       const res = await fetch(apiUrl)
       const data = await res.json()
       console.log("[SellerDashboard] Orders fetched:", data.orders)
-      setOrders(data.orders || [])
+      
+      if (res.ok) {
+        setOrders(data.orders || [])
+      } else {
+        console.error("[SellerDashboard] Failed to fetch orders:", data);
+        toast({ 
+          title: "Error Loading Orders", 
+          description: data.error || "Failed to fetch orders", 
+          variant: "destructive" 
+        })
+      }
     } catch (error) {
       console.error("[SellerDashboard] Error fetching orders:", error)
+      toast({ 
+        title: "Network Error", 
+        description: "Failed to connect to server while loading orders", 
+        variant: "destructive" 
+      })
     } finally {
       setIsLoadingOrders(false)
     }
@@ -360,24 +375,40 @@ export default function SellerDashboard() {
   const handleViewOrderDetails = async (order: any) => {
     setLoadingOrderId(order.id);
     try {
+      console.log('[SellerDashboard] Fetching order details for orderId:', order.orderId, 'sellerId:', sellerInfo.id);
       const response = await fetch(`/api/seller/order-details?orderId=${order.orderId}&sellerId=${sellerInfo.id}`)
       const data = await response.json()
       
       if (response.ok && data.success) {
-        setSelectedOrder(data.order)
+        console.log('[SellerDashboard] Order details fetched successfully:', data.orderDetails);
+        setSelectedOrder(data.orderDetails)
         setIsOrderModalOpen(true)
       } else {
+        console.error('[SellerDashboard] Failed to fetch order details:', data);
+        let errorMessage = data.error || "Failed to fetch order details";
+        
+        // Provide more specific error messages
+        if (data.details) {
+          if (data.details.includes("does not exist")) {
+            errorMessage = "This order no longer exists in the database";
+          } else if (data.details.includes("No seller order found")) {
+            errorMessage = "This order is not associated with your seller account";
+          } else {
+            errorMessage = `${data.error}: ${data.details}`;
+          }
+        }
+        
         toast({ 
-          title: "Error", 
-          description: data.error || "Failed to fetch order details", 
+          title: "Error Loading Order", 
+          description: errorMessage, 
           variant: "destructive" 
         })
       }
     } catch (error) {
-      console.error("Error fetching order details:", error)
+      console.error('[SellerDashboard] Network error fetching order details:', error)
       toast({ 
-        title: "Error", 
-        description: "Failed to fetch order details", 
+        title: "Network Error", 
+        description: "Failed to connect to server. Please check your internet connection and try again.", 
         variant: "destructive" 
       })
     } finally {

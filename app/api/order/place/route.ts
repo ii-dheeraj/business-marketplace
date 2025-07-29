@@ -190,6 +190,49 @@ export async function POST(request: NextRequest) {
       console.error('[ERROR] Real-time notification failed:', JSON.stringify(err, null, 2))
       // Don't fail the order if notifications fail
     }
+
+    // Automatically assign order to available delivery agent
+    try {
+      console.log('[ORDER PLACE] Attempting to assign order to delivery agent:', order.id)
+      const assignResponse = await fetch(`${request.nextUrl.origin}/api/delivery/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id })
+      })
+
+      if (assignResponse.ok) {
+        const assignData = await assignResponse.json()
+        console.log('[ORDER PLACE] Order assigned to delivery agent:', assignData)
+        
+        // Notify the assigned delivery agent
+        if (assignData.deliveryAgent) {
+          try {
+            await realtimeManager.sendNotification(assignData.deliveryAgent.id.toString(), {
+              type: 'order_update',
+              title: 'New Order Assigned! 🚚',
+              message: `You have been assigned order #${order.orderNumber} worth ₹${order.totalAmount}`,
+              data: {
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                totalAmount: order.totalAmount,
+                customerName: customerDetails.name,
+                customerAddress: customerDetails.address
+              },
+              timestamp: new Date(),
+              userId: assignData.deliveryAgent.id.toString()
+            })
+          } catch (notifyErr) {
+            console.error('[ORDER PLACE] Failed to notify delivery agent:', notifyErr)
+          }
+        }
+      } else {
+        console.log('[ORDER PLACE] No delivery agent available for assignment')
+      }
+    } catch (assignErr) {
+      console.error('[ORDER PLACE] Failed to assign order to delivery agent:', assignErr)
+      // Don't fail the order if assignment fails
+    }
+
     // Send real-time notification to all involved sellers
     for (const sellerId of involvedSellerIds) {
       try {
@@ -243,6 +286,10 @@ export async function GET(request: NextRequest) {
   const deliveryAgentId = searchParams.get("deliveryAgentId")
   const status = searchParams.get("status")
 
+  console.log('[ORDER PLACE API] GET request params:', { 
+    customerId, orderId, page, limit, deliveryAgentId, status 
+  })
+
   try {
     if (orderId) {
       const { data: order, error } = await supabase
@@ -251,6 +298,7 @@ export async function GET(request: NextRequest) {
         .eq('id', Number(orderId))
         .single()
       if (error || !order) {
+        console.error('[ORDER PLACE API] Order not found:', orderId, error)
         return NextResponse.json({ error: "Order not found" }, { status: 404 })
       }
       // Hide 'PENDING' payment method from user-facing response
@@ -317,27 +365,44 @@ export async function GET(request: NextRequest) {
       let query = supabase
         .from('orders')
         .select('id, orderNumber, orderStatus, customerName, customerPhone, totalAmount, paymentStatus, paymentMethod, deliveryAgentId, created_at, updated_at')
+      
+      // Apply filters
       if (deliveryAgentId) {
         query = query.eq('deliveryAgentId', Number(deliveryAgentId))
       }
       if (status) {
         query = query.eq('orderStatus', status)
       }
+      
+      // Apply pagination and ordering
       query = query.order('created_at', { ascending: false }).range(skip, skip + limit - 1)
+      
       const { data: orders, error } = await query
       if (error) {
+        console.error('[GET ERROR] Delivery agent orders fetch error:', error)
         return NextResponse.json({ error: "Failed to fetch orders", details: error }, { status: 500 })
       }
-      const { count } = await supabase
+      
+      // Get total count for pagination
+      let countQuery = supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
-        .eq('deliveryAgentId', Number(deliveryAgentId))
+      
+      if (deliveryAgentId) {
+        countQuery = countQuery.eq('deliveryAgentId', Number(deliveryAgentId))
+      }
+      if (status) {
+        countQuery = countQuery.eq('orderStatus', status)
+      }
+      
+      const { count } = await countQuery
+      
       return NextResponse.json({
-        orders,
+        orders: orders || [],
         pagination: {
           page,
           limit,
-          total: count,
+          total: count || 0,
           totalPages: Math.ceil((count || 0) / limit)
         }
       })
@@ -364,8 +429,11 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error("Error fetching orders:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[ORDER PLACE API] Error fetching orders:", error)
+    return NextResponse.json({ 
+      error: "Internal server error", 
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }
 

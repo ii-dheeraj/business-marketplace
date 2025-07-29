@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         phone,
         password: hashedPassword,
         name: businessName, // Use businessName as default personal name
-        businessAddress: , // Placeholder, required by schema
+        businessAddress: `${businessArea}, ${businessLocality}, ${businessCity}, ${businessState} - ${businessPincode}`, // Construct address from components
       }])
       .select()
       .single();
