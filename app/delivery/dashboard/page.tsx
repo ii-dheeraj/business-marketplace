@@ -65,6 +65,7 @@ interface ModalState {
   returnReason: string
   disputeReason: string
   evidenceFile: File | null
+  verifiedOrders: { [orderId: string]: boolean }
 }
 
 export default function DeliveryDashboard() {
@@ -84,7 +85,8 @@ export default function DeliveryDashboard() {
     showDisputeForm: false,
     returnReason: '',
     disputeReason: '',
-    evidenceFile: null
+    evidenceFile: null,
+    verifiedOrders: {}
   })
   const { toast } = useToast()
 
@@ -93,7 +95,34 @@ export default function DeliveryDashboard() {
   useEffect(() => {
     fetchOrders()
     getCurrentLocation()
+    loadVerifiedOrders()
   }, [])
+
+  const loadVerifiedOrders = () => {
+    try {
+      const stored = localStorage.getItem('verifiedOrders')
+      if (stored) {
+        const verifiedOrders = JSON.parse(stored)
+        setModalState(prev => ({ ...prev, verifiedOrders }))
+      }
+    } catch (error) {
+      console.error('Error loading verified orders:', error)
+    }
+  }
+
+  const saveVerifiedOrder = (orderId: string) => {
+    try {
+      const verifiedOrders = { ...modalState.verifiedOrders, [orderId]: true }
+      localStorage.setItem('verifiedOrders', JSON.stringify(verifiedOrders))
+      setModalState(prev => ({ ...prev, verifiedOrders }))
+    } catch (error) {
+      console.error('Error saving verified order:', error)
+    }
+  }
+
+  const isOrderVerified = (orderId: string) => {
+    return modalState.verifiedOrders[orderId] || false
+  }
 
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
@@ -578,6 +607,32 @@ export default function DeliveryDashboard() {
     closeModal()
   }
 
+  const handleNavigateToSeller = (order: Order) => {
+    if (location) {
+      const sellerUrl = `https://www.google.com/maps/search/?api=1&query=${order.sellerAddress}`;
+      window.open(sellerUrl, '_blank');
+    } else {
+      toast({
+        title: "Location Error",
+        description: "Current location is not available to navigate to the seller.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleNavigateToCustomer = (order: Order) => {
+    if (location) {
+      const customerUrl = `https://www.google.com/maps/search/?api=1&query=${order.address}`;
+      window.open(customerUrl, '_blank');
+    } else {
+      toast({
+        title: "Location Error",
+        description: "Current location is not available to navigate to the customer.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="container max-w-4xl mx-auto px-4 py-6">
@@ -755,41 +810,71 @@ export default function DeliveryDashboard() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
               {activeDeliveries.map((order) => (
-                <Card key={order.id} className="bg-white shadow-md rounded-xl p-4">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Order #{order.id}</h3>
-                      <p className="text-sm text-gray-600">{order.customer}</p>
+                <Card key={order.id} className="w-full bg-white border border-gray-200 shadow-md rounded-xl p-4 md:p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Left Column: Seller Details + Navigate */}
+                    <div className="flex flex-col space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Store className="h-5 w-5 text-indigo-600" />
+                        <h3 className="text-lg font-semibold text-gray-900">Seller Details</h3>
+                      </div>
+                      <div className="flex flex-col space-y-1 text-sm">
+                        <p className="font-medium text-gray-800">{order.seller}</p>
+                        <p className="text-gray-600 flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          <span className="truncate">{order.sellerAddress}</span>
+                        </p>
+                        <p className="text-gray-600 flex items-center gap-1">
+                          <Phone className="h-4 w-4" />
+                          <span>Seller Phone</span>
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => handleNavigateToSeller(order)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                      >
+                        <MapPin className="h-4 w-4 mr-1" />
+                        Navigate to Seller
+                      </Button>
                     </div>
-                    <Badge className="bg-yellow-100 text-yellow-800 rounded-full px-2 py-1 text-xs">
-                      {order.status}
-                    </Badge>
-                  </div>
-                  
-                  <div className="space-y-3 mb-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Store className="h-4 w-4" />
-                      <span>{order.seller}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <MapPin className="h-4 w-4" />
-                      <span className="truncate">{order.sellerAddress}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Home className="h-4 w-4" />
-                      <span className="truncate">{order.address}</span>
-                    </div>
-                  </div>
 
-                  <Button
-                    onClick={() => openModal(order)}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Details
-                  </Button>
+                    {/* Right Column: Customer Details + View Order */}
+                    <div className="flex flex-col space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-5 w-5 text-green-600" />
+                        <h3 className="text-lg font-semibold text-gray-900">Customer Details</h3>
+                      </div>
+                      <div className="flex flex-col space-y-1 text-sm">
+                        <p className="font-medium text-gray-800">{order.customer}</p>
+                        <p className="text-gray-600 flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          <span className="truncate">{order.address}</span>
+                        </p>
+                        <p className="text-gray-600 flex items-center gap-1">
+                          <Phone className="h-4 w-4" />
+                          <span>{order.phone}</span>
+                        </p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          onClick={() => handleNavigateToCustomer(order)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                        >
+                          <MapPin className="h-4 w-4 mr-1" />
+                          Navigate to Customer
+                        </Button>
+                        <Button
+                          onClick={() => openModal(order)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View Order
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </Card>
               ))}
             </div>
@@ -907,152 +992,190 @@ export default function DeliveryDashboard() {
 
       {/* Order Details Modal */}
       <Dialog open={modalState.isOpen} onOpenChange={closeModal}>
-        <DialogContent className="max-w-xl w-full p-4 rounded-lg bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-xl w-full p-6 rounded-lg bg-white shadow-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pb-3">
-            <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-              <Package className="h-4 w-4" />
+            <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-gray-900">
+              <Package className="h-5 w-5" />
               Order Details - #{modalState.selectedOrder?.id}
             </DialogTitle>
           </DialogHeader>
 
           {modalState.selectedOrder && (
-            <div className="space-y-4">
-              {/* Customer + Seller Info - Two Column Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-gray-600" />
-                    <h3 className="text-sm font-semibold text-gray-700">Customer Info</h3>
-                  </div>
-                  <div className="pl-6 space-y-1">
-                    <p className="text-sm font-medium text-gray-800">{modalState.selectedOrder.customer}</p>
-                    <p className="text-xs flex items-center gap-1 text-gray-600">
-                      <Phone className="h-3 w-3" />
-                      {modalState.selectedOrder.phone}
-                    </p>
-                    <p className="text-xs flex items-center gap-1 text-gray-600">
-                      <MapPin className="h-3 w-3" />
-                      <span className="truncate">{modalState.selectedOrder.address}</span>
-                    </p>
-                  </div>
-                </div>
+            <div className="space-y-6">
+              {/* Customer Info */}
+              <Card className="bg-slate-50 shadow-sm rounded-lg">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-700">
+                    <Users className="h-5 w-5" />
+                    Customer Info
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="font-medium text-gray-800">{modalState.selectedOrder.customer}</p>
+                  <p className="text-sm flex items-center gap-1 text-gray-600">
+                    <Phone className="h-4 w-4" />
+                    {modalState.selectedOrder.phone}
+                  </p>
+                  <p className="text-sm flex items-center gap-1 text-gray-600">
+                    <MapPin className="h-4 w-4" />
+                    {modalState.selectedOrder.address}
+                  </p>
+                </CardContent>
+              </Card>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Store className="h-4 w-4 text-gray-600" />
-                    <h3 className="text-sm font-semibold text-gray-700">Seller Info</h3>
-                  </div>
-                  <div className="pl-6">
-                    <p className="text-sm font-medium text-gray-800">{modalState.selectedOrder.seller}</p>
-                    <p className="text-xs text-gray-600 mt-1">{modalState.selectedOrder.sellerAddress}</p>
-                  </div>
-                </div>
-              </div>
+              {/* Seller Info */}
+              <Card className="bg-slate-50 shadow-sm rounded-lg">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-700">
+                    <Store className="h-5 w-5" />
+                    Seller Info
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="font-medium text-gray-800">{modalState.selectedOrder.seller}</p>
+                  <p className="text-xs text-gray-600 mt-1">{modalState.selectedOrder.sellerAddress}</p>
+                </CardContent>
+              </Card>
 
-              {/* Order Details - Compact Table */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <ShoppingBag className="h-4 w-4 text-gray-600" />
-                  <h3 className="text-sm font-semibold text-gray-700">Order Details</h3>
-                </div>
-                <div className="pl-6">
-                  <div className="space-y-2">
-                    {modalState.selectedOrder.items.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center text-sm">
-                        <span className="font-medium text-gray-800">
-                          {item.name} (x{item.quantity})
-                        </span>
-                        <span className="text-gray-600">₹{item.price * item.quantity}</span>
-                      </div>
-                    ))}
-                    <div className="border-t pt-2 mt-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-900">Total</span>
-                        <span className="font-bold text-gray-900">₹{modalState.selectedOrder.totalAmount}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pickup OTP & Buyer OTP Input - Horizontal Layout */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                {/* Pickup OTP */}
-                {modalState.selectedOrder.parcel_otp && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4 text-blue-600" />
-                      <h3 className="text-sm font-semibold text-gray-700">Pickup OTP</h3>
-                    </div>
-                    <div className="bg-blue-100 text-blue-700 font-semibold px-3 py-2 rounded text-center">
-                      <span className="text-sm tracking-wider font-mono">
-                        {modalState.selectedOrder.parcel_otp}
+              {/* Order Details */}
+              <Card className="bg-slate-50 shadow-sm rounded-lg">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-700">
+                    <ShoppingBag className="h-5 w-5" />
+                    Order Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {modalState.selectedOrder.items.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center text-sm">
+                      <span className="font-medium text-gray-800">
+                        {item.name} (x{item.quantity})
                       </span>
+                      <span className="text-gray-600">₹{item.price * item.quantity}</span>
+                    </div>
+                  ))}
+                  <div className="border-t pt-2 mt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-gray-900">Total</span>
+                      <span className="font-bold text-lg text-gray-900">₹{modalState.selectedOrder.totalAmount}</span>
                     </div>
                   </div>
-                )}
+                </CardContent>
+              </Card>
 
-                {/* Buyer OTP Input */}
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4 text-gray-600" />
-                    <h3 className="text-sm font-semibold text-gray-700">Buyer OTP</h3>
-                  </div>
-                  <Input
-                    type="text"
-                    placeholder="Enter 6-digit OTP"
-                    value={modalState.buyerOtp}
-                    onChange={(e) => validateBuyerOtp(e.target.value)}
-                    className="px-2 py-1 text-sm border rounded"
-                    maxLength={6}
-                  />
-                  {!modalState.isOtpValid && modalState.buyerOtp && (
-                    <p className="text-xs text-red-600">Please enter a valid 6-digit OTP</p>
-                  )}
-                  {modalState.isOtpValid && (
-                    <p className="text-xs text-green-600">✓ OTP verified! Actions enabled.</p>
-                  )}
-                </div>
-              </div>
+              {/* Pickup OTP - Enhanced Styling */}
+              {modalState.selectedOrder.parcel_otp && (
+                <Card className="bg-blue-50 border border-blue-200 shadow-sm rounded-lg">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg font-semibold text-blue-700">
+                      <Package className="h-5 w-5" />
+                      Pickup OTP
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center">
+                      <div className="bg-blue-100 text-blue-700 font-semibold px-3 py-2 rounded text-center inline-block">
+                        <span className="text-lg tracking-wider font-mono">
+                          {modalState.selectedOrder.parcel_otp}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-              {/* Action Buttons - Compact Layout */}
-              <div className="flex gap-2 justify-center mt-4">
+              {/* Buyer OTP Verification - Enhanced */}
+              {!isOrderVerified(modalState.selectedOrder.id) ? (
+                <Card className="bg-slate-50 shadow-sm rounded-lg">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-700">
+                      <Package className="h-5 w-5" />
+                      Buyer OTP Verification
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <Input
+                        type="text"
+                        placeholder="Enter Buyer OTP to verify"
+                        value={modalState.buyerOtp}
+                        onChange={(e) => validateBuyerOtp(e.target.value)}
+                        className="px-3 py-2 border rounded w-full"
+                        maxLength={6}
+                      />
+                      {!modalState.isOtpValid && modalState.buyerOtp && (
+                        <p className="text-sm text-red-600">Please enter a valid 6-digit OTP</p>
+                      )}
+                      {modalState.isOtpValid && (
+                        <div className="space-y-2">
+                          <p className="text-sm text-green-600">✓ OTP verified successfully. Actions enabled.</p>
+                          <Button
+                            onClick={() => {
+                              saveVerifiedOrder(modalState.selectedOrder!.id)
+                              setModalState(prev => ({ ...prev, isOtpValid: true }))
+                            }}
+                            className="bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-4 py-2 transition-all duration-200"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Verify OTP
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="bg-green-50 border border-green-200 shadow-sm rounded-lg">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg font-semibold text-green-700">
+                      <CheckCircle className="h-5 w-5" />
+                      OTP Verified
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-green-700">✓ OTP verified successfully. Actions are now enabled.</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Action Buttons - Enhanced */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <Button
                   onClick={() => handleCompleteDelivery(modalState.selectedOrder!.id)}
-                  disabled={!modalState.isOtpValid}
-                  className={`text-sm px-3 py-1.5 rounded-lg font-semibold shadow-sm transition-all duration-200 ${
-                    modalState.isOtpValid 
-                      ? 'bg-green-600 hover:bg-green-700 text-white focus:ring-2 focus:ring-green-500 focus:ring-offset-1' 
+                  disabled={!isOrderVerified(modalState.selectedOrder!.id)}
+                  className={`text-white px-4 py-2 rounded-md shadow hover:opacity-90 transition-all duration-200 ${
+                    isOrderVerified(modalState.selectedOrder!.id)
+                      ? 'bg-green-600 hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2' 
                       : 'bg-gray-400 cursor-not-allowed opacity-50'
                   }`}
                 >
-                  <CheckCircle className="h-3 w-3 mr-1" />
+                  <CheckCircle className="h-4 w-4 mr-2" />
                   Delivered
                 </Button>
 
                 <Button
                   onClick={handleReturn}
-                  disabled={!modalState.isOtpValid}
-                  className={`text-sm px-3 py-1.5 rounded-lg font-semibold shadow-sm transition-all duration-200 ${
-                    modalState.isOtpValid 
-                      ? 'bg-yellow-500 hover:bg-yellow-600 text-white focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1' 
+                  disabled={!isOrderVerified(modalState.selectedOrder!.id)}
+                  className={`text-white px-4 py-2 rounded-md shadow hover:opacity-90 transition-all duration-200 ${
+                    isOrderVerified(modalState.selectedOrder!.id)
+                      ? 'bg-yellow-500 hover:bg-yellow-600 focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2' 
                       : 'bg-gray-400 cursor-not-allowed opacity-50'
                   }`}
                 >
-                  <ArrowLeft className="h-3 w-3 mr-1" />
+                  <ArrowLeft className="h-4 w-4 mr-2" />
                   Return
                 </Button>
 
                 <Button
                   onClick={handleDispute}
-                  disabled={!modalState.isOtpValid}
-                  className={`text-sm px-3 py-1.5 rounded-lg font-semibold shadow-sm transition-all duration-200 ${
-                    modalState.isOtpValid 
-                      ? 'bg-red-500 hover:bg-red-600 text-white focus:ring-2 focus:ring-red-500 focus:ring-offset-1' 
+                  disabled={!isOrderVerified(modalState.selectedOrder!.id)}
+                  className={`text-white px-4 py-2 rounded-md shadow hover:opacity-90 transition-all duration-200 ${
+                    isOrderVerified(modalState.selectedOrder!.id)
+                      ? 'bg-red-500 hover:bg-red-600 focus:ring-2 focus:ring-red-500 focus:ring-offset-2' 
                       : 'bg-gray-400 cursor-not-allowed opacity-50'
                   }`}
                 >
-                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  <AlertTriangle className="h-4 w-4 mr-2" />
                   Dispute
                 </Button>
               </div>
