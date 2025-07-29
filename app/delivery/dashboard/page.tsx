@@ -1,804 +1,731 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Label } from "@/components/ui/label"
-import { Package, MapPin, Clock, DollarSign, Navigation, Phone, CheckCircle, User, Key, Map, Truck } from "lucide-react"
-import { getCookie } from "@/lib/utils"
+import { Package, MapPin, Phone, Clock, CheckCircle, Truck, User, ShoppingBag } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
-// Mock data
-const stats = {
-  totalDeliveries: 156,
-  todayDeliveries: 8,
-  earnings: 12400,
-  rating: 4.7,
+interface Order {
+  id: string
+  orderId: number
+  seller: string
+  customer: string
+  phone: string
+  address: string
+  items: Array<{
+    name: string
+    quantity: number
+    price: number
+  }>
+  totalAmount: number
+  status: string
+  otp_verified: boolean
+  parcel_otp: string | null
+  deliveryAgentId: number
+  created_at: string
+  updated_at: string
+  isUnassigned?: boolean // Flag to identify unassigned orders
 }
 
 export default function DeliveryDashboard() {
-  const [activeTab, setActiveTab] = useState("available")
-  const [locationStatus, setLocationStatus] = useState("")
-  const [dataLoading, setDataLoading] = useState(false)
-  const [availableOrders, setAvailableOrders] = useState<any[]>([])
-  const [activeDeliveries, setActiveDeliveries] = useState<any[]>([])
-  const [deliveryHistory, setDeliveryHistory] = useState<any[]>([])
+  const [availableOrders, setAvailableOrders] = useState<Order[]>([])
+  const [activeDeliveries, setActiveDeliveries] = useState<Order[]>([])
+  const [completedDeliveries, setCompletedDeliveries] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [agentName, setAgentName] = useState<string>("")
-  const [agentId, setAgentId] = useState<number | null>(null)
-  const [stats, setStats] = useState<any>({ totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
-  const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null)
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
   const [isTracking, setIsTracking] = useState(false)
-  const [otpGeneratedOrders, setOtpGeneratedOrders] = useState<{[key: string]: string}>({})
+  const [trackingInterval, setTrackingInterval] = useState<NodeJS.Timeout | null>(null)
+  const { toast } = useToast()
+
+  const agentId = 1 // This should come from authentication
 
   useEffect(() => {
-      // Get delivery agent name and id from userInfo cookie
-      const userInfoCookie = getCookie("userInfo")
-      let deliveryAgentId = null
-    if (userInfoCookie) {
-      try {
-        const user = JSON.parse(userInfoCookie)
-        setAgentName(user.name || "")
-        setAgentId(user.id)
-        deliveryAgentId = user.id
-      } catch {}
-    }
-      // Fetch orders and stats
-      const fetchOrders = async () => {
-        setLoading(true)
-        setError("")
-        try {
-          const url = deliveryAgentId ? `/api/delivery/orders?deliveryAgentId=${deliveryAgentId}` : "/api/delivery/orders"
-          const res = await fetch(url)
-          const data = await res.json()
-          if (res.ok) {
-            setAvailableOrders(data.availableOrders || [])
-            setActiveDeliveries(data.activeDeliveries || [])
-            setStats(data.stats || { totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
-            
-            // Check for existing OTPs for ready-for-pickup orders
-            const readyForPickupOrders = data.activeDeliveries?.filter((d: any) => d.status === "READY_FOR_DELIVERY") || []
-            for (const order of readyForPickupOrders) {
-              try {
-                const otpResponse = await fetch("/api/order/generate-otp", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ 
-                    orderId: order.id, 
-                    deliveryAgentId: deliveryAgentId || 0,
-                    checkOnly: true 
-                  })
-                })
-                const otpData = await otpResponse.json()
-                if (otpResponse.ok && otpData.success && otpData.otp) {
-                  setOtpGeneratedOrders(prev => ({
-                    ...prev,
-                    [order.id]: otpData.otp
-                  }))
-                }
-              } catch (error) {
-                console.error("Error checking OTP for order:", order.id, error)
-              }
-            }
-          } else {
-            setError(data.error || "Failed to fetch orders")
-          }
-        } catch (err) {
-          setError("Failed to fetch orders")
-        } finally {
-          setLoading(false)
-        }
-      }
-      const fetchHistory = async () => {
-        if (!deliveryAgentId) return
-        try {
-          const res = await fetch(`/api/order/place?deliveryAgentId=${deliveryAgentId}&status=DELIVERED`)
-          const data = await res.json()
-          if (res.ok && data.orders) {
-            setDeliveryHistory(data.orders)
-          }
-      } catch {}
-      }
-      fetchOrders()
-      fetchHistory()
+    fetchOrders()
+    getCurrentLocation()
   }, [])
 
-  const refreshOrders = async () => {
-    if (!agentId) return
-    setLoading(true)
-    setError("")
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          })
+        },
+        (error) => {
+          console.error("Error getting location:", error)
+          toast({
+            title: "Location Error",
+            description: "Unable to get your current location",
+            variant: "destructive",
+          })
+        }
+      )
+    }
+  }
+
+  const fetchOrders = async () => {
     try {
-      const url = `/api/delivery/orders?deliveryAgentId=${agentId}`
-      const res = await fetch(url)
-      const data = await res.json()
-      if (res.ok) {
+      setLoading(true)
+      const response = await fetch(`/api/delivery/orders?deliveryAgentId=${agentId}`)
+      const data = await response.json()
+
+      if (response.ok) {
         setAvailableOrders(data.availableOrders || [])
         setActiveDeliveries(data.activeDeliveries || [])
-        setStats(data.stats || { totalDeliveries: 0, todayDeliveries: 0, earnings: 0, rating: null })
+        setCompletedDeliveries(data.completedDeliveries || [])
       } else {
-        setError(data.error || "Failed to fetch orders")
+        console.error("Failed to fetch orders:", data)
+        toast({
+          title: "Error",
+          description: "Failed to fetch orders",
+          variant: "destructive",
+        })
       }
-    } catch (err) {
-      setError("Failed to fetch orders")
+    } catch (error) {
+      console.error("Error fetching orders:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch orders",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
-      }
-    
-  const handleAcceptOrder = async (orderId: string) => {
-    if (!agentId) return
-    try {
-      const res = await fetch("/api/delivery/orders", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, deliveryAgentId: agentId, action: "accept" })
-      })
-      if (res.ok) {
-        refreshOrders()
-      }
-    } catch {}
   }
 
-  const handleCompleteDelivery = async (orderId: string) => {
-    if (!agentId) return
+  const handleAcceptOrder = async (orderId: string) => {
     try {
-      const res = await fetch("/api/delivery/orders", {
+      const order = availableOrders.find(o => o.id === orderId)
+      const actualOrderId = order?.orderId || orderId
+
+      const response = await fetch("/api/delivery/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, deliveryAgentId: agentId, action: "delivered" })
+        body: JSON.stringify({ 
+          orderId: actualOrderId, 
+          deliveryAgentId: agentId, 
+          action: "accept" 
+        }),
       })
-      if (res.ok) {
-        refreshOrders()
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Order accepted successfully",
+        })
+        fetchOrders()
+      } else {
+        console.error("Failed to accept order:", data)
+        toast({
+          title: "Error",
+          description: data.error || "Failed to accept order",
+          variant: "destructive",
+        })
       }
-    } catch {}
+    } catch (error) {
+      console.error("Error accepting order:", error)
+      toast({
+        title: "Error",
+        description: "Failed to accept order",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleGenerateOTP = async (orderId: string) => {
+    try {
+      const order = activeDeliveries.find(o => o.id === orderId)
+      const actualOrderId = order?.orderId || orderId
+
+      const response = await fetch("/api/order/generate-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: actualOrderId,
+          deliveryAgentId: agentId
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast({
+          title: "OTP Generated",
+          description: `OTP: ${data.otp}`,
+        })
+        fetchOrders()
+      } else {
+        console.error("Failed to generate OTP:", data)
+        toast({
+          title: "Error",
+          description: data.error || "Failed to generate OTP",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error generating OTP:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate OTP",
+        variant: "destructive",
+      })
+    }
   }
 
   const handlePickupParcel = async (orderId: string) => {
-    if (!agentId) return
     try {
-      const res = await fetch("/api/delivery/orders", {
+      const order = activeDeliveries.find(o => o.id === orderId)
+      const actualOrderId = order?.orderId || orderId
+
+      const response = await fetch("/api/delivery/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, deliveryAgentId: agentId, action: "picked_up" })
+        body: JSON.stringify({ 
+          orderId: actualOrderId, 
+          deliveryAgentId: agentId, 
+          action: "pickup" 
+        }),
       })
-      if (res.ok) {
-        refreshOrders()
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Parcel picked up successfully",
+        })
+        fetchOrders()
+      } else {
+        console.error("Failed to pickup parcel:", data)
+        toast({
+          title: "Error",
+          description: data.error || "Failed to pickup parcel",
+          variant: "destructive",
+        })
       }
-    } catch {}
+    } catch (error) {
+      console.error("Error picking up parcel:", error)
+      toast({
+        title: "Error",
+        description: "Failed to pickup parcel",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleStartDelivery = async (orderId: string) => {
-    if (!agentId) return
     try {
-      const res = await fetch("/api/order/tracking", {
-        method: "POST",
+      const order = activeDeliveries.find(o => o.id === orderId)
+      const actualOrderId = order?.orderId || orderId
+
+      const response = await fetch("/api/delivery/orders", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          orderId, 
+          orderId: actualOrderId, 
           deliveryAgentId: agentId, 
           action: "start_delivery" 
-        })
+        }),
       })
-      if (res.ok) {
-        refreshOrders()
-        // Start GPS tracking if not already active
-        if (!isTracking) {
-          startTracking()
-        }
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Delivery started successfully",
+        })
+        startLocationTracking(actualOrderId)
+        fetchOrders()
+      } else {
+        console.error("Failed to start delivery:", data)
+        toast({
+          title: "Error",
+          description: data.error || "Failed to start delivery",
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error("Error starting delivery:", error)
+      toast({
+        title: "Error",
+        description: "Failed to start delivery",
+        variant: "destructive",
+      })
     }
   }
 
-  // Function to start GPS tracking
-  const startTracking = () => {
-    if (!navigator.geolocation) {
-      setLocationStatus("Geolocation not supported");
-      return;
-    }
-    setIsTracking(true);
-    setLocationStatus("Starting GPS tracking...");
-    
-    const watchId = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const location = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setCurrentLocation(location);
-        setLocationStatus("GPS tracking active");
-        
-        // Update location for all active deliveries
-        if (agentId && activeDeliveries.length) {
-          for (const delivery of activeDeliveries) {
-            try {
-              await fetch("/api/order/tracking", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  orderId: delivery.id,
-                  deliveryAgentId: agentId,
-                  action: "update_location",
-                  location: location
-                })
-              });
-            } catch (error) {
-              console.error("Error updating location:", error);
-            }
-          }
-        }
-      },
-      (error) => {
-        setLocationStatus("GPS tracking failed");
-        setIsTracking(false);
-        console.error("GPS error:", error);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-    );
-    
-    // Store watch ID for cleanup
-    return () => navigator.geolocation.clearWatch(watchId);
-  };
+  const handleCompleteDelivery = async (orderId: string) => {
+    try {
+      const order = activeDeliveries.find(o => o.id === orderId)
+      const actualOrderId = order?.orderId || orderId
 
-  // Function to stop GPS tracking
-  const stopTracking = () => {
-    setIsTracking(false);
-    setLocationStatus("GPS tracking stopped");
-  };
+      const response = await fetch("/api/delivery/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          orderId: actualOrderId, 
+          deliveryAgentId: agentId, 
+          action: "complete" 
+        }),
+      })
 
-  // Function to update GPS location for all active deliveries (legacy)
-  const updateLocation = async () => {
-    if (!agentId || !activeDeliveries.length) return;
-    if (!navigator.geolocation) {
-      setLocationStatus("Geolocation not supported");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      setLocationStatus("Updating location...");
-      for (const delivery of activeDeliveries) {
-        await fetch("/api/delivery/orders", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "update_location",
-            orderId: delivery.id,
-            deliveryAgentId: agentId,
-            location: { lat: pos.coords.latitude, lng: pos.coords.longitude }
-          })
-        });
+      const data = await response.json()
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Delivery completed successfully",
+        })
+        stopLocationTracking()
+        fetchOrders()
+      } else {
+        console.error("Failed to complete delivery:", data)
+        toast({
+          title: "Error",
+          description: data.error || "Failed to complete delivery",
+          variant: "destructive",
+        })
       }
-      setLocationStatus("Location updated");
-    }, () => setLocationStatus("Failed to get location"));
-  };
-
-  useEffect(() => {
-    if (activeDeliveries.length) {
-      updateLocation();
-      const interval = setInterval(updateLocation, 10000); // update every 10s
-      return () => clearInterval(interval);
+    } catch (error) {
+      console.error("Error completing delivery:", error)
+      toast({
+        title: "Error",
+        description: "Failed to complete delivery",
+        variant: "destructive",
+      })
     }
-  }, [activeDeliveries, agentId]);
-
-  const handleViewRoute = (pickup: string, delivery: string) => {
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(delivery)}`
-    window.open(url, "_blank")
   }
 
-  const handleCallCustomer = (phone: string) => {
-    window.open(`tel:${phone}`)
+  const startLocationTracking = (orderId: number) => {
+    setIsTracking(true)
+    const interval = setInterval(() => {
+      if (location) {
+        updateLocation(orderId, location)
+      }
+    }, 10000) // Update every 10 seconds
+    setTrackingInterval(interval)
+  }
+
+  const stopLocationTracking = () => {
+    setIsTracking(false)
+    if (trackingInterval) {
+      clearInterval(trackingInterval)
+      setTrackingInterval(null)
+    }
+  }
+
+  const updateLocation = async (orderId: number, location: { latitude: number; longitude: number }) => {
+    try {
+      const response = await fetch("/api/delivery/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: orderId,
+          deliveryAgentId: agentId,
+          action: "update_location",
+          location: {
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: 10,
+            speed: 0,
+            heading: 0
+          }
+        }),
+      })
+
+      if (!response.ok) {
+        console.error("Failed to update location")
+      }
+    } catch (error) {
+      console.error("Error updating location:", error)
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig: { [key: string]: { variant: "default" | "secondary" | "destructive" | "outline", text: string } } = {
+      'PENDING': { variant: 'outline', text: 'Pending' },
+      'ACCEPTED_BY_AGENT': { variant: 'secondary', text: 'Accepted' },
+      'OTP_GENERATED': { variant: 'secondary', text: 'OTP Generated' },
+      'OTP_VERIFIED': { variant: 'default', text: 'Ready for Pickup' },
+      'PARCEL_PICKED_UP': { variant: 'default', text: 'Picked Up' },
+      'IN_TRANSIT': { variant: 'default', text: 'In Transit' },
+      'DELIVERED': { variant: 'outline', text: 'Delivered' },
+      'CANCELLED': { variant: 'destructive', text: 'Cancelled' }
+    }
+
+    const config = statusConfig[status] || { variant: 'outline', text: status }
+    return <Badge variant={config.variant}>{config.text}</Badge>
+  }
+
+  const getActionButtons = (order: Order) => {
+    const buttons = []
+
+    switch (order.status) {
+      case 'PENDING':
+        buttons.push(
+          <Button
+            key="accept"
+            onClick={() => handleAcceptOrder(order.id)}
+            className="flex-1"
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            {order.isUnassigned ? "Accept & Assign Order" : "Accept Order"}
+          </Button>
+        )
+        break
+
+      case 'ACCEPTED_BY_AGENT':
+        buttons.push(
+          <Button
+            key="generate-otp"
+            onClick={() => handleGenerateOTP(order.id)}
+            className="flex-1"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Generate OTP
+          </Button>
+        )
+        break
+
+      case 'OTP_GENERATED':
+        buttons.push(
+          <div key="otp-info" className="flex-1 text-center p-2 bg-yellow-50 border border-yellow-200 rounded">
+            <p className="text-sm text-yellow-800">Waiting for seller to verify OTP</p>
+          </div>
+        )
+        break
+
+      case 'OTP_VERIFIED':
+        buttons.push(
+          <Button
+            key="pickup"
+            onClick={() => handlePickupParcel(order.id)}
+            className="flex-1 bg-green-600 hover:bg-green-700"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Pickup Parcel
+          </Button>
+        )
+        break
+
+      case 'PARCEL_PICKED_UP':
+        buttons.push(
+          <Button
+            key="start-delivery"
+            onClick={() => handleStartDelivery(order.id)}
+            className="flex-1 bg-blue-600 hover:bg-blue-700"
+          >
+            <Truck className="h-4 w-4 mr-2" />
+            Start Delivery
+          </Button>
+        )
+        break
+
+      case 'IN_TRANSIT':
+        buttons.push(
+          <Button
+            key="complete"
+            onClick={() => handleCompleteDelivery(order.id)}
+            className="flex-1 bg-green-600 hover:bg-green-700"
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Complete Delivery
+          </Button>
+        )
+        break
+    }
+
+    return buttons
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-2">Loading orders...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Welcome back, {agentName || "Delivery Agent"}!</h1>
-              <p className="text-gray-600">Ready to deliver happiness to customers</p>
-            </div>
-            
-            {/* GPS Tracking Controls */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <Map className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium">GPS Tracking</span>
-              </div>
-              <div className="flex gap-2">
-                {!isTracking ? (
-                  <Button 
-                    onClick={startTracking} 
-                    size="sm" 
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Map className="h-4 w-4 mr-1" />
-                    Start Tracking
-                  </Button>
-                ) : (
-                  <Button 
-                    onClick={stopTracking} 
-                    size="sm" 
-                    variant="destructive"
-                  >
-                    <Map className="h-4 w-4 mr-1" />
-                    Stop Tracking
-                  </Button>
-                )}
-              </div>
-              {locationStatus && (
-                <p className="text-xs text-gray-500">{locationStatus}</p>
-              )}
-              {currentLocation && (
-                <p className="text-xs text-gray-500">
-                  Location: {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Deliveries</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalDeliveries}</div>
-              <p className="text-xs text-muted-foreground">All time</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Deliveries</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.todayDeliveries}</div>
-              <p className="text-xs text-muted-foreground">Completed today</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₹{stats.earnings?.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">This month</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Rating</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.rating ? `${stats.rating}/5` : "-"}</div>
-              <p className="text-xs text-muted-foreground">Customer rating</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="available">Available Orders</TabsTrigger>
-            <TabsTrigger value="pickup">Ready for Pickup</TabsTrigger>
-            <TabsTrigger value="active">Active Deliveries</TabsTrigger>
-            <TabsTrigger value="history">Delivery History</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="available" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Available Orders</h2>
-              <Badge variant="secondary">{availableOrders.length} orders available</Badge>
-            </div>
-
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>Loading available orders...</p>
-              </div>
-            ) : error ? (
-              <div className="text-center py-8 text-red-500">
-                <p>{error}</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {availableOrders.map((order) => (
-                  <Card key={order.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="text-lg font-semibold">{order.id}</h3>
-                          <p className="text-gray-600">{order.seller}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-green-600">₹{order.deliveryFee}</p>
-                          <p className="text-sm text-gray-500">Delivery fee</p>
-                        </div>
-                      </div>
-
-                      <div className="grid md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <MapPin className="h-4 w-4 text-blue-600" />
-                            <span className="font-medium">Pickup</span>
-                          </div>
-                          <p className="text-sm text-gray-600 ml-6">{order.pickup}</p>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <MapPin className="h-4 w-4 text-green-600" />
-                            <span className="font-medium">Delivery</span>
-                          </div>
-                          <p className="text-sm text-gray-600 ml-6">{order.delivery}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between mb-4 text-sm text-gray-600">
-                        <span>Items: {order.items}</span>
-                        <span>Distance: {order.distance}</span>
-                        <span>Est. Time: {order.estimatedTime}</span>
-                        </div>
-
-                      <div className="flex gap-2">
-                        <Button onClick={() => handleAcceptOrder(order.id)} className="flex-1">
-                          Accept Order
-                        </Button>
-                        <Button variant="outline" onClick={() => handleViewRoute(order.pickup, order.delivery)}>
-                          <Navigation className="h-4 w-4 mr-2" />
-                          View Route
-                        </Button>
-                        <Button variant="outline" onClick={() => handleCallCustomer(order.customerPhone)}>
-                          <Phone className="h-4 w-4 mr-2" />
-                          Call Customer
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="pickup" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Ready for Pickup</h2>
-              <Badge variant="default">{activeDeliveries.filter(d => d.status === "READY_FOR_DELIVERY").length} ready</Badge>
-            </div>
-
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>Loading pickup orders...</p>
-              </div>
-            ) : error ? (
-              <div className="text-center py-8 text-red-500">
-                <p>{error}</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {activeDeliveries.filter(delivery => delivery.status === "READY_FOR_DELIVERY").map((delivery) => (
-                  <Card key={delivery.id} className="border-orange-200 bg-orange-50">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="text-lg font-semibold">Order #{delivery.id}</h3>
-                          <p className="text-gray-600">Customer: {delivery.customer}</p>
-                          <Badge variant="default" className="mt-1 bg-orange-500">
-                            Ready for Pickup
-                          </Badge>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-green-600">₹{delivery.deliveryFee}</p>
-                          <p className="text-sm text-gray-500">Delivery fee</p>
-                        </div>
-                      </div>
-
-                      {/* Seller Information */}
-                      <div className="mb-4 p-4 bg-white rounded-lg border">
-                        <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                          <Package className="h-4 w-4 text-orange-600" />
-                          Seller Information
-                        </h4>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm font-medium text-gray-700">Seller Name:</p>
-                            <p className="text-sm text-gray-600">{delivery.seller}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-700">Seller Phone:</p>
-                            <p className="text-sm text-gray-600">{delivery.sellerPhone}</p>
-                          </div>
-                        </div>
-                        <div className="mt-2">
-                          <p className="text-sm font-medium text-gray-700">Seller Address:</p>
-                          <p className="text-sm text-gray-600">{delivery.sellerAddress}</p>
-                        </div>
-                      </div>
-
-                      {/* Customer Information */}
-                      <div className="mb-4 p-4 bg-white rounded-lg border">
-                        <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                          <User className="h-4 w-4 text-green-600" />
-                          Customer Information
-                        </h4>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm font-medium text-gray-700">Customer Name:</p>
-                            <p className="text-sm text-gray-600">{delivery.customer}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-700">Customer Phone:</p>
-                            <p className="text-sm text-gray-600">{delivery.customerPhone}</p>
-                          </div>
-                        </div>
-                        <div className="mt-2">
-                          <p className="text-sm font-medium text-gray-700">Delivery Address:</p>
-                          <p className="text-sm text-gray-600">{delivery.delivery}</p>
-                        </div>
-                      </div>
-
-                      {/* Product Information */}
-                      <div className="mb-4 p-4 bg-white rounded-lg border">
-                        <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                          <Package className="h-4 w-4 text-blue-600" />
-                          Product Details
-                        </h4>
-                        {delivery.productDetails && delivery.productDetails.length > 0 ? (
-                          <div className="space-y-2">
-                            {delivery.productDetails.map((product: any, index: number) => (
-                              <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                <div>
-                                  <p className="text-sm font-medium text-gray-700">{product.name}</p>
-                                  <p className="text-xs text-gray-500">Quantity: {product.quantity}</p>
-                                </div>
-                                <p className="text-sm font-medium text-gray-700">₹{product.price}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500">No product details available</p>
-                        )}
-                      </div>
-
-                      <div className="grid md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <MapPin className="h-4 w-4 text-orange-600" />
-                            <span className="font-medium">Pickup Location</span>
-                          </div>
-                          <p className="text-sm text-gray-600 ml-6">{delivery.pickup}</p>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <MapPin className="h-4 w-4 text-green-600" />
-                            <span className="font-medium">Delivery Location</span>
-                          </div>
-                          <p className="text-sm text-gray-600 ml-6">{delivery.delivery}</p>
-                          <p className="text-sm text-gray-500 ml-6">Customer: {delivery.customer}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between mb-4 text-sm text-gray-600">
-                        <span>Total Amount: ₹{delivery.amount}</span>
-                        <span>Distance: {delivery.distance}</span>
-                        <span>Est. Time: {delivery.estimatedTime}</span>
-                      </div>
-
-                      <div className="flex flex-col gap-2 mt-4 p-4 bg-white rounded-lg border">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-medium">OTP for Seller</Label>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                try {
-                                  const response = await fetch("/api/order/generate-otp", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ 
-                                      orderId: delivery.id, 
-                                      deliveryAgentId: agentId || 0 
-                                    })
-                                  })
-
-                                  const data = await response.json()
-
-                                  if (response.ok && data.success) {
-                                    // Store the OTP (either existing or newly generated)
-                                    setOtpGeneratedOrders(prev => ({
-                                      ...prev,
-                                      [delivery.id]: data.otp
-                                    }))
-                                  } else {
-                                    console.error("Failed to get OTP:", data.error)
-                                  }
-                                } catch (error) {
-                                  console.error("Error getting OTP:", error)
-                                }
-                              }}
-                              className="flex items-center gap-2"
-                            >
-                              <Key className="h-4 w-4" />
-                              {otpGeneratedOrders[delivery.id] ? "Show OTP" : "Get OTP"}
-                            </Button>
-                          </div>
-
-                          {otpGeneratedOrders[delivery.id] && (
-                            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                              <div className="flex items-center gap-2 mb-2">
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                                <span className="text-sm font-medium text-green-800">OTP Available</span>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-2xl font-bold text-green-600 tracking-wider mb-2">
-                                  {otpGeneratedOrders[delivery.id]}
-                                </div>
-                                <p className="text-xs text-green-700">
-                                  Share this OTP with the seller to verify parcel pickup
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          <p className="text-xs text-gray-500 text-center">
-                            {otpGeneratedOrders[delivery.id]
-                              ? "OTP is static and remains the same for this order" 
-                              : "Get OTP and share with seller when you arrive"
-                            }
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 mt-4">
-                        <Button variant="outline" onClick={() => handleViewRoute(delivery.pickup, delivery.delivery)}>
-                          <Navigation className="h-4 w-4 mr-2" />
-                          Navigate to Pickup
-                        </Button>
-                        <Button variant="outline" onClick={() => handleCallCustomer(delivery.customerPhone)}>
-                          <Phone className="h-4 w-4 mr-2" />
-                          Call Customer
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="active" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Active Deliveries</h2>
-              <Badge variant="default">{activeDeliveries.filter(d => d.status === "PICKED_UP" || d.status === "IN_TRANSIT").length} active</Badge>
-            </div>
-
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>Loading active deliveries...</p>
-              </div>
-            ) : error ? (
-              <div className="text-center py-8 text-red-500">
-                <p>{error}</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {activeDeliveries.filter(delivery => delivery.status === "PICKED_UP" || delivery.status === "IN_TRANSIT").map((delivery) => (
-                  <Card key={delivery.id} className="border-blue-200 bg-blue-50">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="text-lg font-semibold">{delivery.id}</h3>
-                          <p className="text-gray-600">{delivery.seller}</p>
-                          <Badge variant="default" className="mt-1">
-                            {delivery.status === "PICKED_UP" ? "Picked Up" : "In Transit"}
-                        </Badge>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-green-600">₹{delivery.deliveryFee}</p>
-                          <p className="text-sm text-gray-500">Delivery fee</p>
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <MapPin className="h-4 w-4 text-green-600" />
-                          <span className="font-medium">Delivering to</span>
-                        </div>
-                        <p className="text-sm text-gray-600 ml-6">{delivery.delivery}</p>
-                        <p className="text-sm text-gray-500 ml-6">Customer: {delivery.customer}</p>
-                      </div>
-
-                      <div className="flex items-center justify-between mb-4 text-sm text-gray-600">
-                        <span>Items: {delivery.items}</span>
-                        <span>ETA: {delivery.estimatedTime}</span>
-                      </div>
-
-                        <div className="flex gap-2">
-                          {delivery.status === "PICKED_UP" && (
-                            <Button 
-                              onClick={() => handleStartDelivery(delivery.id)} 
-                              className="flex-1 bg-blue-600 hover:bg-blue-700"
-                            >
-                              <Truck className="h-4 w-4 mr-2" />
-                              Start Delivery
-                            </Button>
-                          )}
-                          {delivery.status === "IN_TRANSIT" && (
-                            <Button onClick={() => handleCompleteDelivery(delivery.id)} className="flex-1">
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Complete Delivery
-                            </Button>
-                          )}
-                          <Button variant="outline" onClick={() => handleViewRoute(delivery.pickup, delivery.delivery)}>
-                            <Navigation className="h-4 w-4 mr-2" />
-                            Navigate
-                          </Button>
-                          <Button variant="outline" onClick={() => handleCallCustomer(delivery.customerPhone)}>
-                            <Phone className="h-4 w-4 mr-2" />
-                            Call Customer
-                          </Button>
-                        </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="history" className="space-y-6">
-            <h2 className="text-2xl font-bold">Delivery History</h2>
-            {deliveryHistory.length === 0 ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Deliveries</CardTitle>
-                  <CardDescription>Your completed deliveries</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8 text-gray-500">
-                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No delivery history available</p>
-                    <p className="text-sm">Complete your first delivery to see history</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {deliveryHistory.map((order: any) => (
-                  <Card key={order.id} className="border-green-200 bg-green-50">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="text-lg font-semibold">{order.orderNumber || order.id}</h3>
-                          <p className="text-gray-600">{order.customerName}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-green-600">₹{order.deliveryFee}</p>
-                          <p className="text-sm text-gray-500">Delivery fee</p>
-                        </div>
-                      </div>
-                      <div className="mb-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <MapPin className="h-4 w-4 text-green-600" />
-                          <span className="font-medium">Delivered to</span>
-                        </div>
-                        <p className="text-sm text-gray-600 ml-6">{order.customerAddress}</p>
-                        <p className="text-sm text-gray-500 ml-6">Customer: {order.customerName}</p>
-                      </div>
-                      <div className="flex items-center justify-between mb-4 text-sm text-gray-600">
-                        <span>Items: {order.items?.map((i: any) => i.productName).join(", ")}</span>
-                        <span>Delivered At: {order.actualDeliveryTime ? new Date(order.actualDeliveryTime).toLocaleString() : "-"}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+    <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Delivery Dashboard</h1>
+        <p className="text-gray-600">Manage your deliveries and track orders</p>
       </div>
+
+      <Tabs defaultValue="available" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="available">Available Orders</TabsTrigger>
+          <TabsTrigger value="active">Active Deliveries</TabsTrigger>
+          <TabsTrigger value="completed">Completed</TabsTrigger>
+          <TabsTrigger value="tracking">GPS Tracking</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="available" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Available Orders</h2>
+            <Badge variant="default">{availableOrders.length} available</Badge>
+          </div>
+          {availableOrders.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No available orders at the moment</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {availableOrders.map((order) => (
+                <Card key={order.id} className={order.isUnassigned ? "border-2 border-blue-200 bg-blue-50" : ""}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <ShoppingBag className="h-5 w-5" />
+                          Order #{order.id}
+                          {order.isUnassigned && (
+                            <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-800 border-blue-300">
+                              Unassigned
+                            </Badge>
+                          )}
+                        </CardTitle>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {new Date(order.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      {getStatusBadge(order.status)}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Seller</p>
+                          <p className="text-sm">{order.seller}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Customer</p>
+                          <p className="text-sm">{order.customer}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Delivery Address</p>
+                        <p className="text-sm flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          {order.address}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Customer Phone</p>
+                        <p className="text-sm flex items-center gap-1">
+                          <Phone className="h-4 w-4" />
+                          {order.phone}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Items</p>
+                        <p className="text-sm">
+                          {order.items.map(item => `${item.name} (${item.quantity})`).join(", ")}
+                        </p>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Total Amount</p>
+                          <p className="text-lg font-bold">₹{order.totalAmount}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          {getActionButtons(order)}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="active" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Active Deliveries</h2>
+            <Badge variant="default">{activeDeliveries.length} active</Badge>
+          </div>
+          {activeDeliveries.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No active deliveries</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {activeDeliveries.map((order) => (
+                <Card key={order.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Truck className="h-5 w-5" />
+                          Order #{order.id}
+                        </CardTitle>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {new Date(order.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      {getStatusBadge(order.status)}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Seller</p>
+                          <p className="text-sm">{order.seller}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Customer</p>
+                          <p className="text-sm">{order.customer}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Delivery Address</p>
+                        <p className="text-sm flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          {order.address}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Customer Phone</p>
+                        <p className="text-sm flex items-center gap-1">
+                          <Phone className="h-4 w-4" />
+                          {order.phone}
+                        </p>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Total Amount</p>
+                          <p className="text-lg font-bold">₹{order.totalAmount}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          {getActionButtons(order)}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="completed" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Completed Deliveries</h2>
+            <Badge variant="outline">{completedDeliveries.length} completed</Badge>
+          </div>
+          {completedDeliveries.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No completed deliveries yet</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {completedDeliveries.map((order) => (
+                <Card key={order.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          Order #{order.id}
+                        </CardTitle>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Completed: {new Date(order.updated_at).toLocaleString()}
+                        </p>
+                      </div>
+                      {getStatusBadge(order.status)}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Seller</p>
+                          <p className="text-sm">{order.seller}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Customer</p>
+                          <p className="text-sm">{order.customer}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Total Amount</p>
+                        <p className="text-lg font-bold">₹{order.totalAmount}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="tracking" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">GPS Tracking</h2>
+            <Badge variant={isTracking ? "default" : "outline"}>
+              {isTracking ? "Tracking Active" : "Tracking Inactive"}
+            </Badge>
+          </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="grid gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Current Location</p>
+                  {location ? (
+                    <p className="text-sm">
+                      Lat: {location.latitude.toFixed(6)}, Lng: {location.longitude.toFixed(6)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500">Location not available</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Tracking Status</p>
+                  <p className="text-sm">
+                    {isTracking ? "GPS tracking is active" : "GPS tracking is inactive"}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={getCurrentLocation}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Update Location
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

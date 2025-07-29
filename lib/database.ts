@@ -285,7 +285,7 @@ export const createOrder = async (data: {
       paymentMethod: data.paymentMethod,
       deliveryInstructions: data.deliveryInstructions,
       parcel_otp: data.deliveryOTP, // Store the delivery OTP
-      orderStatus: 'CONFIRMED',
+      orderStatus: 'PENDING', // Changed from 'CONFIRMED' to 'PENDING'
     }])
     .select()
     .single()
