@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import OrderDetailsModal from "@/components/order-details-modal"
+import EnhancedOrderDetailsModal from "@/components/enhanced-order-details-modal"
 
 import {
   Package,
@@ -70,6 +70,7 @@ export default function SellerDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [loadingOrderId, setLoadingOrderId] = useState<number | null>(null);
+  const [activeOrderTab, setActiveOrderTab] = useState('pending'); // New state for order subtabs
 
 
 
@@ -373,35 +374,17 @@ export default function SellerDashboard() {
   }
 
   const handleViewOrderDetails = async (order: any) => {
-    setLoadingOrderId(order.id);
-    try {
-      // Simple implementation - just use the order data we already have
-      console.log('[SellerDashboard] Showing order details for order:', order);
-      setSelectedOrder(order)
+    setLoadingOrderId(order.id)
       setIsOrderModalOpen(true)
-    } catch (error) {
-      console.error('[SellerDashboard] Error showing order details:', error)
-      toast({ 
-        title: "Error", 
-        description: "Failed to show order details", 
-        variant: "destructive" 
-      })
-    } finally {
-      setLoadingOrderId(null);
-    }
+    setSelectedOrder(order)
+    setLoadingOrderId(null)
   }
 
   const handleOrderModalClose = () => {
     setIsOrderModalOpen(false)
     setSelectedOrder(null)
+    fetchOrders() // Refresh orders when modal closes
   }
-
-  const handleOrderUpdate = () => {
-    // Refresh orders after OTP verification
-    fetchOrders(currentPage)
-  }
-
-
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -782,128 +765,223 @@ export default function SellerDashboard() {
 
           {/* Orders Tab */}
           <TabsContent value="orders" className="space-y-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5 text-blue-600" />
                 Orders
               </h2>
               <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
                   <span className="text-gray-600">{orders.filter(o => o.status === 'PENDING').length} Pending</span>
-                </div>
+                          </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                  <span className="text-gray-600">{orders.filter(o => o.status === 'CONFIRMED').length} Confirmed</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-3">
-              {isLoadingOrders ? (
-                Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="rounded-lg shadow-md bg-white border border-gray-200 p-4 mb-3 animate-pulse flex flex-col sm:flex-row justify-between gap-4">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-3">
-                        <div className="h-5 w-28 bg-gray-200 rounded"></div>
-                        <div className="h-5 w-20 bg-gray-100 rounded-full"></div>
+                  <span className="text-gray-600">{orders.filter(o => o.status === 'IN_TRANSIT').length} Transit</span>
+                        </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-600">{orders.filter(o => o.status === 'DELIVERED').length} Completed</span>
+                        </div>
                       </div>
-                      <div className="h-3 w-32 bg-gray-100 rounded"></div>
-                      <div className="h-3 w-24 bg-gray-100 rounded"></div>
+                          </div>
+
+            {/* Order Status Subtabs */}
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8">
+                {[
+                  { key: 'pending', label: 'Pending', count: orders.filter(o => o.status === 'PENDING').length, color: 'yellow' },
+                  { key: 'transit', label: 'Transit', count: orders.filter(o => o.status === 'IN_TRANSIT').length, color: 'blue' },
+                  { key: 'completed', label: 'Completed', count: orders.filter(o => o.status === 'DELIVERED').length, color: 'green' },
+                  { key: 'return', label: 'Return', count: orders.filter(o => o.status === 'RETURN_REQUESTED').length, color: 'orange' },
+                  { key: 'dispute', label: 'Dispute', count: orders.filter(o => o.status === 'DISPUTED').length, color: 'red' }
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveOrderTab(tab.key)}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                      activeOrderTab === tab.key
+                        ? `border-${tab.color}-500 text-${tab.color}-600`
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {tab.label}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${tab.color}-100 text-${tab.color}-800`}>
+                      {tab.count}
+                    </span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            {/* Orders for Active Tab */}
+            <div className="flex flex-col gap-3">
+              {(() => {
+                const filteredOrders = orders.filter(order => {
+                  switch (activeOrderTab) {
+                    case 'pending': return order.status === 'PENDING';
+                    case 'transit': return order.status === 'IN_TRANSIT';
+                    case 'completed': return order.status === 'DELIVERED';
+                    case 'return': return order.status === 'RETURN_REQUESTED';
+                    case 'dispute': return order.status === 'DISPUTED';
+                    default: return true;
+                  }
+                });
+
+                if (isLoadingOrders) {
+                  return Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="rounded-lg shadow-md bg-white border border-gray-200 p-4 mb-3 animate-pulse flex flex-col sm:flex-row justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-3">
+                          <div className="h-5 w-28 bg-gray-200 rounded"></div>
+                          <div className="h-5 w-20 bg-gray-100 rounded-full"></div>
+                        </div>
+                        <div className="h-3 w-32 bg-gray-100 rounded"></div>
+                        <div className="h-3 w-24 bg-gray-100 rounded"></div>
+                      </div>
+                      <div className="flex flex-col items-end justify-between min-w-[120px] gap-2">
+                        <div className="h-5 w-20 bg-gray-100 rounded"></div>
+                        <div className="h-7 w-24 bg-gray-100 rounded-md"></div>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end justify-between min-w-[120px] gap-2">
-                      <div className="h-5 w-20 bg-gray-100 rounded"></div>
-                      <div className="h-7 w-24 bg-gray-100 rounded-md"></div>
+                  ));
+                }
+
+                if (filteredOrders.length === 0) {
+                  return (
+                    <div className="rounded-lg shadow-md bg-white border border-gray-200 p-8 mb-3 text-center">
+                      <div className="mx-auto w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 border-2 border-gray-100">
+                        <ShoppingCart className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No {activeOrderTab.charAt(0).toUpperCase() + activeOrderTab.slice(1)} Orders</h3>
+                      <p className="text-gray-600 max-w-sm mx-auto">No orders found in this category.</p>
                     </div>
-                  </div>
-                ))
-              ) : orders.length === 0 ? (
-                <div className="rounded-lg shadow-md bg-white border border-gray-200 p-8 mb-3 text-center">
-                  <div className="mx-auto w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 border-2 border-gray-100">
-                    <ShoppingCart className="h-8 w-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Orders Yet</h3>
-                  <p className="text-gray-600 max-w-sm mx-auto">Orders will appear here when customers place them.</p>
-                </div>
-              ) : (
-                orders.map((order) => (
+                  );
+                }
+
+                return filteredOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="rounded-lg shadow-md bg-white border border-gray-200 p-4 mb-3 flex flex-col sm:flex-row justify-between gap-4 hover:shadow-lg transition-all duration-200 hover:border-gray-300"
+                    className="rounded-lg shadow-md bg-white border border-gray-200 p-4 mb-3 hover:shadow-lg transition-all duration-200 hover:border-gray-300 cursor-pointer"
+                    onClick={() => handleViewOrderDetails(order)}
                   >
-                    {/* Left: Order Info */}
-                    <div className="flex-1 flex flex-col gap-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-semibold text-gray-900">Order #{order.orderNumber || order.orderId}</span>
-                        <span className="bg-gray-50 text-gray-700 px-3 py-1 rounded-full text-xs flex items-center gap-1 font-medium border border-gray-200">
-                          <Clock className="h-3 w-3 text-blue-600" />
+                    {/* Order Header */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                        <ShoppingCart className="h-4 w-4 text-green-600" />
+                      </div>
+                      <span className="text-lg font-bold text-gray-900">Order #{order.orderNumber || order.orderId}</span>
+                    </div>
+
+                    {/* Main Content - Two Column Layout */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                      {/* Product Details Section */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Package className="h-3 w-3 text-blue-600" />
+                          </div>
+                          <h3 className="font-bold text-gray-900">Product Details</h3>
+                        </div>
+                        <div className="space-y-2 pl-7">
+                          {Array.isArray(order.items) && order.items.length > 0 ? (
+                            order.items.map((item: any, idx: number) => (
+                              <div key={idx} className="space-y-1">
+                                <p className="text-gray-700 font-medium">{item.productName}</p>
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <span className="text-sm">Quantity: {item.quantity}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <span className="text-sm">Price: ₹{item.unitPrice?.toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <span className="text-sm font-medium">Total: ₹{item.totalPrice?.toLocaleString()}</span>
+                                </div>
+                                {idx < order.items.length - 1 && <hr className="my-2 border-gray-200" />}
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-gray-500 text-sm">No products found</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Customer Details Section */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                            <Users className="h-3 w-3 text-green-600" />
+                          </div>
+                          <h3 className="font-bold text-gray-900">Customer Details</h3>
+                        </div>
+                        <div className="space-y-2 pl-7">
+                          <p className="text-gray-700">{order?.customerName || 'N/A'}</p>
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <MapPin className="h-4 w-4" />
+                            <span className="text-sm">{order?.customerAddress || 'Address not available'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <Phone className="h-4 w-4" />
+                            <span className="text-sm">{order?.customerPhone || 'Phone not available'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order Summary */}
+                    <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Order Summary</span>
+                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">
                           {order.status}
                         </span>
                       </div>
-                      
-                      <div className="bg-gray-50 rounded-md p-3 border border-gray-100">
-                        <div className="text-sm font-medium text-gray-700 mb-1">
-                          Items: {Array.isArray(order.items) ? order.items.length : 0} products
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Items:</span>
+                          <span className="text-gray-900">{Array.isArray(order.items) ? order.items.length : 0} products</span>
                         </div>
-                        {Array.isArray(order.items) && order.items.length > 0 && (
-                          <ul className="list-disc ml-4 text-xs text-gray-600 space-y-0.5">
-                            {order.items.map((item: any, idx: number) => (
-                              <li key={idx} className="text-gray-700">{item.productName} x {item.quantity}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                      
-                      <div className="text-xs text-gray-500 flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-gray-400" />
-                        Date: {order.created_at ? new Date(order.created_at).toLocaleDateString('en-IN', {
-                          year: 'numeric', month: 'short', day: 'numeric'
-                        }) : ''}
-                      </div>
-                      
-                      <div className="bg-white rounded-md p-3 border border-gray-200 space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-medium text-gray-600">Subtotal:</span>
-                          <span className="font-semibold text-gray-800 text-sm">₹{order.subtotal?.toLocaleString()}</span>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Total Amount:</span>
+                          <span className="font-semibold text-green-600">₹{order?.totalAmount?.toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-medium text-gray-600">Commission:</span>
-                          <span className="font-semibold text-orange-600 text-sm">₹{order.commission?.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-1 border-t border-gray-100">
-                          <span className="text-xs font-semibold text-gray-700">Net Amount:</span>
-                          <span className="text-sm font-bold text-green-600">₹{order.netAmount?.toLocaleString()}</span>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Date:</span>
+                          <span className="text-gray-900">
+                            {order.created_at ? new Date(order.created_at).toLocaleDateString('en-IN', {
+                              year: 'numeric', month: 'short', day: 'numeric'
+                            }) : 'N/A'}
+                          </span>
                         </div>
                       </div>
                     </div>
-                    
-                    {/* Right: Order Meta */}
-                    <div className="flex flex-col items-end justify-between min-w-[120px] gap-3">
-                      <div className="text-right bg-gray-50 rounded-md p-3 border border-gray-100">
-                        <div className="text-base font-bold text-gray-900">#{order.id}</div>
-                        <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Seller Order</div>
-                      </div>
+
+                    {/* View Details Button */}
+                    <div className="flex justify-end">
                       <button
-                        className="bg-white border-2 border-blue-600 text-blue-600 px-4 py-2 rounded-md hover:bg-blue-600 hover:text-white text-xs font-semibold flex items-center gap-1 transition-all duration-200 shadow-sm hover:shadow-md"
-                        onClick={() => handleViewOrderDetails(order)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors duration-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewOrderDetails(order);
+                        }}
                         disabled={loadingOrderId === order.id}
                       >
                         {loadingOrderId === order.id ? (
                           <>
-                            <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             <span>Loading...</span>
                           </>
                         ) : (
                           <>
-                            <Eye className="h-3 w-3" />
-                            <span>View Details</span>
+                            <Eye className="h-4 w-4" />
+                            <span>View Order</span>
                           </>
                         )}
                       </button>
                     </div>
                   </div>
-                ))
-              )}
+                ));
+              })()}
             </div>
           </TabsContent>
 
@@ -1191,11 +1269,12 @@ export default function SellerDashboard() {
       )}
 
       {/* Order Details Modal */}
-      <OrderDetailsModal
+      <EnhancedOrderDetailsModal
         isOpen={isOrderModalOpen}
         onClose={handleOrderModalClose}
         order={selectedOrder}
-        onOrderUpdate={handleOrderUpdate}
+        sellerId={sellerInfo.id}
+        onOrderUpdate={fetchOrders}
         isLoading={loadingOrderId !== null}
       />
 
