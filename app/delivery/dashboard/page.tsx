@@ -28,7 +28,8 @@ import {
   Upload,
   AlertTriangle,
   ArrowLeft,
-  X
+  X,
+  Loader2
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -676,121 +677,80 @@ export default function DeliveryDashboard() {
         <TabsContent value="available" className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-900">Available Orders</h2>
-            <Badge variant="outline">{availableOrders.length} available</Badge>
+            <Badge variant="default">{availableOrders.length} available</Badge>
           </div>
           {availableOrders.length === 0 ? (
             <Card className="bg-white shadow-md rounded-lg">
               <CardContent className="p-6 text-center">
-                <ShoppingBag className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">No available orders</p>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-6">
+            <div className="space-y-4">
               {availableOrders.map((order) => (
-                <Card key={order.id} className={`bg-white shadow-md rounded-lg ${order.isUnassigned ? "border-2 border-blue-200 bg-blue-50" : ""}`}>
-                  <CardHeader className="pb-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="flex items-center gap-2 text-xl font-semibold text-gray-700">
-                          <ShoppingBag className="h-5 w-5" />
-                          Order #{order.id}
-                          {order.isUnassigned && (
-                            <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-800 border-blue-300">
-                              Unassigned
-                            </Badge>
-                          )}
-                        </CardTitle>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {new Date(order.created_at).toLocaleString()}
-                        </p>
+                <Card key={order.id} className="w-full bg-white border border-gray-200 shadow-sm hover:shadow-md rounded-2xl p-4 md:p-6">
+                  {/* Order Number Header */}
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-blue-600" />
+                      <h3 className="text-lg font-bold text-gray-900">Order #{order.id}</h3>
+                    </div>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                      Available
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Left Column: Seller Details */}
+                    <div className="flex flex-col space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Store className="h-5 w-5 text-indigo-600" />
+                        <h3 className="text-lg font-semibold text-gray-900">Seller Details</h3>
                       </div>
-                      {getStatusBadge(order.status)}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Seller & Customer Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Card className="bg-slate-50 shadow-sm rounded-lg">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-700">
-                            <Store className="h-5 w-5" />
-                            Seller Info
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="font-medium text-gray-800">{order.seller}</p>
-                          <p className="text-xs text-gray-600 mt-1">{order.sellerAddress}</p>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="bg-slate-50 shadow-sm rounded-lg">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-700">
-                            <Users className="h-5 w-5" />
-                            Customer Info
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="font-medium text-gray-800">{order.customer}</p>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Delivery Address */}
-                    <Card className="bg-slate-50 shadow-sm rounded-lg">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-700">
-                          <Home className="h-5 w-5" />
-                          Delivery Address
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm flex items-center gap-1 font-medium text-gray-800">
+                      <div className="flex flex-col space-y-1 text-sm">
+                        <p className="font-medium text-gray-800">{order.seller}</p>
+                        <p className="text-gray-600 flex items-center gap-1">
                           <MapPin className="h-4 w-4" />
-                          {order.address}
+                          <span className="truncate">{order.sellerAddress}</span>
                         </p>
-                        <p className="text-sm flex items-center gap-1 text-gray-500 mt-1">
+                        <p className="text-gray-600 flex items-center gap-1">
                           <Phone className="h-4 w-4" />
-                          {order.phone}
+                          <span>Seller Phone</span>
                         </p>
-                      </CardContent>
-                    </Card>
-
-                    {/* Items Ordered */}
-                    <Card className="bg-slate-50 shadow-sm rounded-lg">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-700">
-                          <Package className="h-5 w-5" />
-                          Items Ordered
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm font-medium text-gray-800">
-                          {order.items.map(item => `${item.name} (${item.quantity})`).join(", ")}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    {/* Total Amount & Actions */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <Card className="bg-slate-50 shadow-sm rounded-lg flex-1">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-700">
-                            <CreditCard className="h-5 w-5" />
-                            Total Amount
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-2xl font-bold text-gray-900">₹{order.totalAmount}</p>
-                        </CardContent>
-                      </Card>
-                      
-                      <div className="flex gap-2 w-full md:w-auto">
-                        {getActionButtons(order)}
                       </div>
                     </div>
-                  </CardContent>
+
+                    {/* Right Column: Customer Details + Accept Button */}
+                    <div className="flex flex-col space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-5 w-5 text-green-600" />
+                        <h3 className="text-lg font-semibold text-gray-900">Customer Details</h3>
+                      </div>
+                      <div className="flex flex-col space-y-1 text-sm">
+                        <p className="font-medium text-gray-800">{order.customer}</p>
+                        <p className="text-gray-600 flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          <span className="truncate">{order.address}</span>
+                        </p>
+                        <p className="text-gray-600 flex items-center gap-1">
+                          <Phone className="h-4 w-4" />
+                          <span>{order.phone}</span>
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-sm text-gray-600">Delivery Fee:</span>
+                          <span className="font-semibold text-green-600">₹{order.totalAmount}</span>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handleAcceptOrder(order.id)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-xl font-medium transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Accept Order
+                      </Button>
+                    </div>
+                  </div>
                 </Card>
               ))}
             </div>
@@ -812,7 +772,18 @@ export default function DeliveryDashboard() {
           ) : (
             <div className="space-y-4">
               {activeDeliveries.map((order) => (
-                <Card key={order.id} className="w-full bg-white border border-gray-200 shadow-md rounded-xl p-4 md:p-6">
+                <Card key={order.id} className="w-full bg-white border border-gray-200 shadow-sm hover:shadow-md rounded-2xl p-4 md:p-6">
+                  {/* Order Number Header */}
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-5 w-5 text-green-600" />
+                      <h3 className="text-lg font-bold text-gray-900">Order #{order.id}</h3>
+                    </div>
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      Active
+                    </Badge>
+                  </div>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Left Column: Seller Details + Navigate */}
                     <div className="flex flex-col space-y-3">
