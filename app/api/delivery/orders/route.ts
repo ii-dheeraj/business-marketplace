@@ -3,10 +3,19 @@ import { supabase } from "@/lib/database"
 
 // Helper function to map order data for delivery agent dashboard
 function mapOrder(order: any) {
+  // Extract seller address components
+  const sellerAddress = order.sellerInfo ? [
+    order.sellerInfo.businessAddress,
+    order.sellerInfo.businessCity,
+    order.sellerInfo.businessState,
+    order.sellerInfo.businessPincode
+  ].filter(Boolean).join(', ') : '-'
+
   return {
     id: order.orderNumber || order.id,
     orderId: order.id, // Add the actual database ID for API calls
     seller: order.sellerInfo?.businessName || order.sellerInfo?.name || "-",
+    sellerAddress: sellerAddress,
     customer: order.customerName || "-",
     phone: order.customerPhone || "-",
     address: order.customerAddress || "-",
@@ -243,7 +252,7 @@ export async function PATCH(request: NextRequest) {
           console.error('[DELIVERY ORDERS API] Delivery agent mismatch:', existingOrder.deliveryAgentId, deliveryAgentId)
           return NextResponse.json({ error: "Delivery agent not assigned to this order" }, { status: 403 })
         }
-        if (existingOrder.orderStatus !== 'OUT_FOR_DELIVERY') {
+        if (!['OUT_FOR_DELIVERY', 'IN_TRANSIT'].includes(existingOrder.orderStatus)) {
           return NextResponse.json({ error: "Order must be out for delivery to complete" }, { status: 400 })
         }
         updateData.orderStatus = 'DELIVERED'
