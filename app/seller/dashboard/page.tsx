@@ -375,40 +375,15 @@ export default function SellerDashboard() {
   const handleViewOrderDetails = async (order: any) => {
     setLoadingOrderId(order.id);
     try {
-      console.log('[SellerDashboard] Fetching order details for orderId:', order.orderId, 'sellerId:', sellerInfo.id);
-      const response = await fetch(`/api/seller/order-details?orderId=${order.orderId}&sellerId=${sellerInfo.id}`)
-      const data = await response.json()
-      
-      if (response.ok && data.success) {
-        console.log('[SellerDashboard] Order details fetched successfully:', data.orderDetails);
-        setSelectedOrder(data.orderDetails)
-        setIsOrderModalOpen(true)
-      } else {
-        console.error('[SellerDashboard] Failed to fetch order details:', data);
-        let errorMessage = data.error || "Failed to fetch order details";
-        
-        // Provide more specific error messages
-        if (data.details) {
-          if (data.details.includes("does not exist")) {
-            errorMessage = "This order no longer exists in the database";
-          } else if (data.details.includes("No seller order found")) {
-            errorMessage = "This order is not associated with your seller account";
-          } else {
-            errorMessage = `${data.error}: ${data.details}`;
-          }
-        }
-        
-        toast({ 
-          title: "Error Loading Order", 
-          description: errorMessage, 
-          variant: "destructive" 
-        })
-      }
+      // Simple implementation - just use the order data we already have
+      console.log('[SellerDashboard] Showing order details for order:', order);
+      setSelectedOrder(order)
+      setIsOrderModalOpen(true)
     } catch (error) {
-      console.error('[SellerDashboard] Network error fetching order details:', error)
+      console.error('[SellerDashboard] Error showing order details:', error)
       toast({ 
-        title: "Network Error", 
-        description: "Failed to connect to server. Please check your internet connection and try again.", 
+        title: "Error", 
+        description: "Failed to show order details", 
         variant: "destructive" 
       })
     } finally {
@@ -807,88 +782,129 @@ export default function SellerDashboard() {
 
           {/* Orders Tab */}
           <TabsContent value="orders" className="space-y-6">
-            <h2 className="text-xl sm:text-2xl font-bold">Orders</h2>
-
-            <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 text-blue-600" />
+                Orders
+              </h2>
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-600">{orders.filter(o => o.status === 'PENDING').length} Pending</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                  <span className="text-gray-600">{orders.filter(o => o.status === 'CONFIRMED').length} Confirmed</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-3">
               {isLoadingOrders ? (
-                // Loading skeleton for orders
                 Array.from({ length: 3 }).map((_, index) => (
-                  <Card key={index}>
-                    <CardContent className="p-4 sm:p-6">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-2">
-                            <div className="h-5 bg-gray-200 rounded animate-pulse w-24"></div>
-                            <div className="h-6 bg-gray-200 rounded animate-pulse w-20"></div>
-                          </div>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse w-32"></div>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse w-28"></div>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse w-36"></div>
-                        </div>
-                        <div className="text-right">
-                          <div className="h-6 bg-gray-200 rounded animate-pulse w-20 mb-2"></div>
-                          <div className="h-8 bg-gray-200 rounded animate-pulse w-24"></div>
-                        </div>
+                  <div key={index} className="rounded-lg shadow-md bg-white border border-gray-200 p-4 mb-3 animate-pulse flex flex-col sm:flex-row justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="h-5 w-28 bg-gray-200 rounded"></div>
+                        <div className="h-5 w-20 bg-gray-100 rounded-full"></div>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div className="h-3 w-32 bg-gray-100 rounded"></div>
+                      <div className="h-3 w-24 bg-gray-100 rounded"></div>
+                    </div>
+                    <div className="flex flex-col items-end justify-between min-w-[120px] gap-2">
+                      <div className="h-5 w-20 bg-gray-100 rounded"></div>
+                      <div className="h-7 w-24 bg-gray-100 rounded-md"></div>
+                    </div>
+                  </div>
                 ))
               ) : orders.length === 0 ? (
-                <Card>
-                  <CardContent className="p-8 text-center text-gray-500">
-                    No orders found yet. Orders will appear here when customers place them.
-                  </CardContent>
-                </Card>
+                <div className="rounded-lg shadow-md bg-white border border-gray-200 p-8 mb-3 text-center">
+                  <div className="mx-auto w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 border-2 border-gray-100">
+                    <ShoppingCart className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Orders Yet</h3>
+                  <p className="text-gray-600 max-w-sm mx-auto">Orders will appear here when customers place them.</p>
+                </div>
               ) : (
                 orders.map((order) => (
-                  <Card key={order.id}>
-                    <CardContent className="p-4 sm:p-6">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">Order #{order.orderId}</h3>
-                            <Badge className={getStatusColor(order.status)}>
-                              {getOrderStatusIcon(order.status)}
-                              <span className="ml-1">{order.status}</span>
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-600">Items: {Array.isArray(order.items) ? order.items.length : 0} products</p>
-                          {Array.isArray(order.items) && order.items.length > 0 && (
-                            <ul className="text-xs text-gray-500 list-disc ml-4">
-                              {order.items.map((item: any, idx: number) => (
-                                <li key={idx}>{item.productName} x {item.quantity}</li>
-                              ))}
-                            </ul>
-                          )}
-                          <p className="text-sm text-gray-600">
-                            Date: {order.created_at ? new Date(order.created_at).toLocaleDateString() : ''}
-                          </p>
-                          <div className="text-xs text-gray-500">
-                            <p>Subtotal: ₹{order.subtotal?.toLocaleString()}</p>
-                            <p>Commission: ₹{order.commission?.toLocaleString()}</p>
-                            <p className="font-medium">Net Amount: ₹{order.netAmount?.toLocaleString()}</p>
-                          </div>
+                  <div
+                    key={order.id}
+                    className="rounded-lg shadow-md bg-white border border-gray-200 p-4 mb-3 flex flex-col sm:flex-row justify-between gap-4 hover:shadow-lg transition-all duration-200 hover:border-gray-300"
+                  >
+                    {/* Left: Order Info */}
+                    <div className="flex-1 flex flex-col gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-semibold text-gray-900">Order #{order.orderNumber || order.orderId}</span>
+                        <span className="bg-gray-50 text-gray-700 px-3 py-1 rounded-full text-xs flex items-center gap-1 font-medium border border-gray-200">
+                          <Clock className="h-3 w-3 text-blue-600" />
+                          {order.status}
+                        </span>
+                      </div>
+                      
+                      <div className="bg-gray-50 rounded-md p-3 border border-gray-100">
+                        <div className="text-sm font-medium text-gray-700 mb-1">
+                          Items: {Array.isArray(order.items) ? order.items.length : 0} products
                         </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold">Order ID: {order.id}</p>
-                          <p className="text-sm text-gray-600 mb-2">Seller Order</p>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="mt-2 bg-transparent hover:bg-blue-50 hover:border-blue-300 transition-colors"
-                            onClick={() => handleViewOrderDetails(order)}
-                            disabled={loadingOrderId === order.id}
-                          >
-                            {loadingOrderId === order.id ? "Loading..." : "View Details"}
-                          </Button>
+                        {Array.isArray(order.items) && order.items.length > 0 && (
+                          <ul className="list-disc ml-4 text-xs text-gray-600 space-y-0.5">
+                            {order.items.map((item: any, idx: number) => (
+                              <li key={idx} className="text-gray-700">{item.productName} x {item.quantity}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      
+                      <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-gray-400" />
+                        Date: {order.created_at ? new Date(order.created_at).toLocaleDateString('en-IN', {
+                          year: 'numeric', month: 'short', day: 'numeric'
+                        }) : ''}
+                      </div>
+                      
+                      <div className="bg-white rounded-md p-3 border border-gray-200 space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-medium text-gray-600">Subtotal:</span>
+                          <span className="font-semibold text-gray-800 text-sm">₹{order.subtotal?.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-medium text-gray-600">Commission:</span>
+                          <span className="font-semibold text-orange-600 text-sm">₹{order.commission?.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+                          <span className="text-xs font-semibold text-gray-700">Net Amount:</span>
+                          <span className="text-sm font-bold text-green-600">₹{order.netAmount?.toLocaleString()}</span>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                    
+                    {/* Right: Order Meta */}
+                    <div className="flex flex-col items-end justify-between min-w-[120px] gap-3">
+                      <div className="text-right bg-gray-50 rounded-md p-3 border border-gray-100">
+                        <div className="text-base font-bold text-gray-900">#{order.id}</div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Seller Order</div>
+                      </div>
+                      <button
+                        className="bg-white border-2 border-blue-600 text-blue-600 px-4 py-2 rounded-md hover:bg-blue-600 hover:text-white text-xs font-semibold flex items-center gap-1 transition-all duration-200 shadow-sm hover:shadow-md"
+                        onClick={() => handleViewOrderDetails(order)}
+                        disabled={loadingOrderId === order.id}
+                      >
+                        {loadingOrderId === order.id ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                            <span>Loading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-3 w-3" />
+                            <span>View Details</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 ))
               )}
             </div>
-
           </TabsContent>
 
           {/* Analytics Tab */}
