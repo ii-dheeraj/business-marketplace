@@ -36,3 +36,4 @@ foreach ($file in $badFiles) {
 git add .
 git commit -am "$commitMessage"
 git push origin main
+ 

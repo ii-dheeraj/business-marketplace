@@ -14,39 +14,135 @@ export async function POST(request: NextRequest) {
       image, 
       sellerId, 
       category,
-      subcategory,
-      stock
+      stock,
+      // New comprehensive product fields
+      productType = 'physical',
+      tags = [],
+      images = [],
+      discountPercent,
+      sku,
+      unit = 'piece',
+      customUnit,
+      downloadUrl,
+      accessInstructions,
+      serviceName,
+      duration,
+      calendlyLink,
+      location,
+      hours,
+      instructions,
+      contactEmail,
+      contactPhone,
+      keyword,
+      slug,
+      seoTags = [],
+      seoDescription,
+      features = [],
+      seoScore = 0,
+      isDeliveryEnabled = true,
+      deliveryRadius = 10,
+      deliveryFee = 0,
+      minOrderAmount = 0,
+      variants = []
     } = body
     
     if (!name || !price || !sellerId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
+
+    // Validate product type specific fields
+    if (productType === 'physical' && (!stock || stock === '')) {
+      return NextResponse.json({ error: "Stock quantity is required for physical products" }, { status: 400 })
+    }
+    
+    if (productType === 'digital' && !downloadUrl) {
+      return NextResponse.json({ error: "Download URL is required for digital products" }, { status: 400 })
+    }
+    
+    if (productType === 'appointment' && (!serviceName || !calendlyLink)) {
+      return NextResponse.json({ error: "Service name and Calendly link are required for appointment products" }, { status: 400 })
+    }
+    
+    if (productType === 'walkin' && (!location || !hours)) {
+      return NextResponse.json({ error: "Location and hours are required for walk-in products" }, { status: 400 })
+    }
+    
+    if ((productType === 'enquiry' || productType === 'onsite') && (!contactEmail || !contactPhone)) {
+      return NextResponse.json({ error: "Contact email and phone are required for enquiry and onsite service products" }, { status: 400 })
+    }
+
+    // Delivery fields are only applicable for physical products
+    const deliveryFields = productType === 'physical' ? {
+      isDeliveryEnabled,
+      deliveryRadius: Number(deliveryRadius),
+      deliveryFee: Number(deliveryFee),
+      minOrderAmount: Number(minOrderAmount)
+    } : {
+      isDeliveryEnabled: false,
+      deliveryRadius: 0,
+      deliveryFee: 0,
+      minOrderAmount: 0
+    }
+
+    // Prepare product data
+    const productData = {
+      name,
+      description,
+      price: Number(price),
+      originalPrice: originalPrice ? Number(originalPrice) : null,
+      image: images.length > 0 ? images[0] : image, // Use first image from array or fallback to single image
+      sellerId: Number(sellerId),
+      category,
+      stock: productType === 'physical' ? (stock ? Number(stock) : 0) : 0,
+      inStock: productType === 'physical' ? ((stock ? Number(stock) : 0) > 0) : true,
+      isActive: true,
+      
+      // New comprehensive fields
+      productType,
+      tags: Array.isArray(tags) ? tags : [],
+      images: Array.isArray(images) ? images : [],
+      discountPercent: discountPercent ? Number(discountPercent) : null,
+      sku,
+      unit,
+      customUnit,
+      downloadUrl,
+      accessInstructions,
+      serviceName,
+      duration: duration ? Number(duration) : null,
+      calendlyLink,
+      location,
+      hours,
+      instructions,
+      contactEmail,
+      contactPhone,
+      keyword,
+      slug,
+      seoTags: Array.isArray(seoTags) ? seoTags : [],
+      seoDescription,
+      features: Array.isArray(features) ? features : [],
+      seoScore: Number(seoScore),
+      variants: Array.isArray(variants) ? variants : [],
+      
+      // Delivery fields (only for physical products)
+      ...deliveryFields
+    }
+
     const { data: product, error: createError } = await supabase
       .from('products')
-      .insert([{
-        name,
-        description,
-        price: Number(price),
-        originalPrice: originalPrice ? Number(originalPrice) : null,
-        image,
-        sellerId: Number(sellerId),
-        category,
-        subcategory,
-        stock: stock ? Number(stock) : 0,
-        inStock: (stock ? Number(stock) : 0) > 0,
-        isActive: true
-      }])
+      .insert([productData])
       .select()
       .single()
+      
     if (createError) {
       return NextResponse.json({ error: createError.message }, { status: 500 })
     }
+    
     // Send real-time notification to seller
     try {
       await realtimeManager.sendNotification(String(sellerId), {
         type: 'notification',
         title: 'Product Added',
-        message: `A new product (ID: ${product.id}) was added.`,
+        message: `A new ${productType.toLowerCase()} product (ID: ${product.id}) was added.`,
         data: product,
         timestamp: new Date(),
         userId: String(sellerId)
@@ -54,6 +150,7 @@ export async function POST(request: NextRequest) {
     } catch (notifyErr) {
       console.error("[API] Failed to send real-time notification to seller:", sellerId, notifyErr)
     }
+    
     return NextResponse.json({ success: true, product })
   } catch (error) {
     console.error("Error adding product:", error)
@@ -72,7 +169,14 @@ export async function GET(request: NextRequest) {
   try {
     let query = supabase
       .from('products')
-      .select('id, name, description, price, originalPrice, image, category, subcategory, stock, inStock, isActive, sellerId, created_at, updated_at', { count: 'exact' })
+      .select(`
+        id, name, description, price, originalPrice, image, category, subcategory, stock, inStock, isActive, sellerId, created_at, updated_at,
+        productType, tags, images, discountPercent, sku, unit, customUnit,
+        downloadUrl, accessInstructions, serviceName, duration, calendlyLink,
+        location, hours, instructions, contactEmail, contactPhone,
+        keyword, slug, seoTags, seoDescription, features, seoScore,
+        isDeliveryEnabled, deliveryRadius, deliveryFee, minOrderAmount, variants
+      `, { count: 'exact' })
       .eq('isActive', true)
       .order('created_at', { ascending: false })
       .range(from, to)
@@ -111,20 +215,90 @@ export async function PATCH(request: NextRequest) {
       subcategory,
       stock,
       inStock,
-      isActive
+      isActive,
+      // New comprehensive product fields
+      productType,
+      tags,
+      images,
+      discountPercent,
+      sku,
+      unit,
+      customUnit,
+      downloadUrl,
+      accessInstructions,
+      serviceName,
+      duration,
+      calendlyLink,
+      location,
+      hours,
+      instructions,
+      contactEmail,
+      contactPhone,
+      keyword,
+      slug,
+      seoTags,
+      seoDescription,
+      features,
+      seoScore,
+      isDeliveryEnabled,
+      deliveryRadius,
+      deliveryFee,
+      minOrderAmount,
+      variants
     } = await request.json()
+    
     if (!id) {
       return NextResponse.json({ error: "Missing product id" }, { status: 400 })
     }
-    // Get current product to compare stock
+    
+    // Get current product to compare stock and validate product type
     const { data: currentProduct, error: findError } = await supabase
       .from('products')
-      .select('stock, sellerId, name')
+      .select('stock, sellerId, name, productType')
       .eq('id', Number(id))
       .single()
+      
     if (findError || !currentProduct) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 })
     }
+
+    // Validate product type specific fields if productType is being updated
+    if (productType) {
+      if (productType === 'DIGITAL' && !downloadUrl) {
+        return NextResponse.json({ error: "Download URL is required for digital products" }, { status: 400 })
+      }
+      
+      if (productType === 'APPOINTMENT' && (!serviceName || !duration || !calendlyLink)) {
+        return NextResponse.json({ error: "Service name, duration, and Calendly link are required for appointment products" }, { status: 400 })
+      }
+      
+      if (productType === 'WALK_IN' && (!location || !hours)) {
+        return NextResponse.json({ error: "Location and hours are required for walk-in products" }, { status: 400 })
+      }
+      
+      if (productType === 'ENQUIRY_ONLY' && (!contactEmail || !contactPhone)) {
+        return NextResponse.json({ error: "Contact email and phone are required for enquiry only products" }, { status: 400 })
+      }
+      
+      if (productType === 'ONSITE_SERVICE' && (!serviceName || !location)) {
+        return NextResponse.json({ error: "Service name and location are required for onsite service products" }, { status: 400 })
+      }
+    }
+
+    // Handle delivery fields based on product type
+    const currentProductType = productType || currentProduct.productType
+    const deliveryFields = currentProductType === 'PHYSICAL' ? {
+      ...(typeof isDeliveryEnabled !== "undefined" && { isDeliveryEnabled }),
+      ...(typeof deliveryRadius !== "undefined" && { deliveryRadius: Number(deliveryRadius) }),
+      ...(typeof deliveryFee !== "undefined" && { deliveryFee: Number(deliveryFee) }),
+      ...(typeof minOrderAmount !== "undefined" && { minOrderAmount: Number(minOrderAmount) })
+    } : {
+      isDeliveryEnabled: false,
+      deliveryRadius: 0,
+      deliveryFee: 0,
+      minOrderAmount: 0
+    }
+
     const updateData: any = {
       ...(name && { name }),
       ...(description && { description }),
@@ -135,8 +309,38 @@ export async function PATCH(request: NextRequest) {
       ...(subcategory && { subcategory }),
       ...(typeof stock !== "undefined" && { stock: Number(stock) }),
       ...(typeof inStock !== "undefined" && { inStock: inStock }),
-      ...(typeof isActive !== "undefined" && { isActive: isActive })
+      ...(typeof isActive !== "undefined" && { isActive: isActive }),
+      
+      // New comprehensive fields
+      ...(productType && { productType }),
+      ...(tags && { tags: Array.isArray(tags) ? tags : [] }),
+      ...(images && { images: Array.isArray(images) ? images : [] }),
+      ...(typeof discountPercent !== "undefined" && { discountPercent: discountPercent ? Number(discountPercent) : null }),
+      ...(sku && { sku }),
+      ...(unit && { unit }),
+      ...(customUnit && { customUnit }),
+      ...(downloadUrl && { downloadUrl }),
+      ...(accessInstructions && { accessInstructions }),
+      ...(serviceName && { serviceName }),
+      ...(typeof duration !== "undefined" && { duration: duration ? Number(duration) : null }),
+      ...(calendlyLink && { calendlyLink }),
+      ...(location && { location }),
+      ...(hours && { hours }),
+      ...(instructions && { instructions }),
+      ...(contactEmail && { contactEmail }),
+      ...(contactPhone && { contactPhone }),
+      ...(keyword && { keyword }),
+      ...(slug && { slug }),
+      ...(seoTags && { seoTags: Array.isArray(seoTags) ? seoTags : [] }),
+      ...(seoDescription && { seoDescription }),
+      ...(features && { features: Array.isArray(features) ? features : [] }),
+      ...(typeof seoScore !== "undefined" && { seoScore: Number(seoScore) }),
+      ...(variants && { variants: Array.isArray(variants) ? variants : [] }),
+      
+      // Delivery fields
+      ...deliveryFields
     }
+    
     // Update inStock based on stock if stock is provided
     if (typeof stock !== "undefined") {
       updateData.inStock = Number(stock) > 0

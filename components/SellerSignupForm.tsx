@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CATEGORIES, getSubcategoriesByCategory } from "@/utils/category-data";
+import { CATEGORIES_WITH_SUBCATEGORIES, getSubcategoriesByCategory } from "@/utils/category-data";
 import { indianStates, indianStateCityMap } from "@/utils/indian-location-data";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -175,7 +175,7 @@ export default function SellerSignupForm({ onSuccess }: { onSuccess?: () => void
         <Label htmlFor="category">Category <span className="text-red-500">*</span></Label>
         <select id="category" value={form.category} onChange={e => handleChange("category", e.target.value)} required className="w-full border rounded px-2 py-2">
           <option value="">Select Category</option>
-          {CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+          {CATEGORIES_WITH_SUBCATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
         </select>
       </div>
       <div>

@@ -1,198 +1,85 @@
-export const CATEGORIES = [
+// Original category structure for seller signup (with subcategories)
+export const CATEGORIES_WITH_SUBCATEGORIES = [
   {
-    id: 'retail-general-stores',
-    name: 'Grocery',
-    subcategories: [
-      'Kirana / Grocery Stores',
-      'Supermarkets / Hypermarkets (e.g., Big Bazaar, DMart)',
-      'Department Stores',
-      'Provision Stores',
-      'Discount Stores',
-      'Convenience Stores',
-    ],
+    id: "professional-services",
+    name: "Professional Services",
+    subcategories: ["Consulting", "Legal Services", "Accounting", "Marketing", "Design", "IT Services", "Education", "Training"]
   },
   {
-    id: 'food-beverage',
-    name: '🍛 Food & Beverage',
-    subcategories: [
-      'Restaurants (Veg / Non-Veg / Multi-Cuisine)',
-      'Cafes & Coffee Shops',
-      'Bakeries & Sweet Shops',
-      'Juice Centers / Shakes & Smoothies',
-      'Ice Cream Parlours',
-      'Street Food Stalls / Tiffin Centers',
-      'Cloud Kitchens / Takeaway Counters',
-      'Organic / Health Food Stores',
-    ],
+    id: "electronics",
+    name: "Electronics",
+    subcategories: ["Mobile Phones", "Computers", "Accessories", "Home Electronics", "Gaming", "Audio Equipment"]
   },
   {
-    id: 'apparel-accessories',
-    name: '🧥 Apparel & Accessories',
-    subcategories: [
-      "Men's Wear Shops",
-      "Women's Wear Shops",
-      'Kids & Baby Wear Stores',
-      'Saree / Ethnic Wear Stores',
-      'Lingerie / Innerwear Stores',
-      'Footwear Stores',
-      'Fashion Boutiques',
-      'Jewelry Stores (Gold / Silver / Artificial)',
-      'Watches & Accessories Stores',
-      'Tailoring & Alteration Shops',
-    ],
+    id: "fashion-apparel",
+    name: "Fashion & Apparel",
+    subcategories: ["Men's Clothing", "Women's Clothing", "Kids' Clothing", "Footwear", "Accessories", "Jewelry"]
   },
   {
-    id: 'home-living',
-    name: '🛋️ Home & Living',
-    subcategories: [
-      'Furniture Stores',
-      'Home Decor / Interior Stores',
-      'Mattress & Bedding Stores',
-      'Lighting & Electricals',
-      'Hardware & Sanitary Ware Shops',
-      'Paint & Wallpaper Shops',
-      'Kitchenware / Crockery Stores',
-    ],
+    id: "home-living",
+    name: "Home & Living",
+    subcategories: ["Furniture", "Kitchen & Dining", "Bedding", "Decor", "Appliances", "Garden"]
   },
   {
-    id: 'electronics-appliances',
-    name: '📱 Electronics & Appliances',
-    subcategories: [
-      'Mobile Stores',
-      'Laptop / Computer Stores',
-      'TV & Home Appliances Stores',
-      'Electronic Components / Repair Shops',
-      'AC / Refrigerator Dealers',
-      'Camera & Accessories Stores',
-    ],
+    id: "beauty-wellness",
+    name: "Beauty & Wellness",
+    subcategories: ["Skincare", "Haircare", "Makeup", "Fragrances", "Spa Services", "Fitness"]
   },
   {
-    id: 'beauty-wellness',
-    name: '🧴 Beauty & Wellness',
-    subcategories: [
-      'Salons (Men / Women / Unisex)',
-      'Spas & Massage Parlours',
-      'Cosmetic Stores',
-      'Ayurvedic / Herbal Product Stores',
-      'Tattoo Studios',
-      'Perfume & Fragrance Shops',
-      'Weight Loss / Slimming Centers',
-    ],
+    id: "food-grocery",
+    name: "Food & Grocery",
+    subcategories: ["Fresh Produce", "Dairy", "Bakery", "Beverages", "Snacks", "Organic Foods"]
   },
   {
-    id: 'handicrafts-art',
-    name: '🧶 Handicrafts & Art',
-    subcategories: [
-      'Handicraft Stores',
-      'Painting & Art Supplies',
-      'Handloom & Khadi Shops',
-      'Antique / Curio Shops',
-    ],
+    id: "digital-software",
+    name: "Digital / Software",
+    subcategories: ["Mobile Apps", "Web Applications", "Software Tools", "Digital Content", "E-books", "Online Courses"]
   },
   {
-    id: 'education-stationery',
-    name: '📚 Education & Stationery',
-    subcategories: [
-      'Book Stores',
-      'Stationery Shops',
-      'Coaching Centers / Tuition Classes',
-      'School Uniform / Bag Shops',
-      'Educational Toy Stores',
-    ],
+    id: "health-therapy",
+    name: "Health & Therapy",
+    subcategories: ["Medical Services", "Dental Care", "Mental Health", "Physiotherapy", "Alternative Medicine", "Nutrition"]
   },
   {
-    id: 'health-medical',
-    name: '🏥 Health & Medical',
-    subcategories: [
-      'Pharmacy / Chemist Shops',
-      'Medical Equipment Stores',
-      'Clinics / Diagnostic Labs',
-      'Ayurvedic / Homeopathy Shops',
-      'Optical Stores',
-      'Veterinary & Pet Clinics',
-    ],
+    id: "automotive",
+    name: "Automotive",
+    subcategories: ["Car Sales", "Auto Parts", "Car Services", "Motorcycles", "Commercial Vehicles", "Auto Accessories"]
   },
   {
-    id: 'automotive',
-    name: '🛠️ Automotive',
-    subcategories: [
-      'Car Showrooms',
-      'Bike Showrooms',
-      'Spare Parts Shops',
-      'Tyre Dealers',
-      'Vehicle Repair & Service Centers',
-      'Car Wash / Detailing Centers',
-    ],
-  },
-  {
-    id: 'pets-livestock',
-    name: '🐾 Pets & Livestock',
-    subcategories: [
-      'Pet Shops',
-      'Aquarium / Fish Shops',
-      'Poultry & Feed Stores',
-    ],
-  },
-  {
-    id: 'construction-building',
-    name: '🏗️ Construction & Building Material',
-    subcategories: [
-      'Cement / Steel / Bricks Suppliers',
-      'Tile & Marble Stores',
-      'Plumbing / Electrical Material Stores',
-      'Paint & Construction Tools Stores',
-    ],
-  },
-  {
-    id: 'travel-lifestyle',
-    name: '🧳 Travel & Lifestyle',
-    subcategories: [
-      'Travel Agencies',
-      'Luggage & Bags Stores',
-      'Gift Shops',
-      'Toy Stores',
-      'Sports & Fitness Stores',
-      'Optical / Sunglass Shops',
-    ],
-  },
-  {
-    id: 'professional-services',
-    name: '💼 Professional Services',
-    subcategories: [
-      'Photocopy / Printing Shops',
-      'Courier & Cargo Agencies',
-      'Cyber Cafes / Internet Centers',
-      'Real Estate Agencies',
-      'Legal / Tax / CA Offices',
-    ],
-  },
-  {
-    id: 'religious-cultural',
-    name: '🕌 Religious & Cultural',
-    subcategories: [
-      'Puja Samagri Shops',
-      'Astrology / Vastu Consultants',
-      'Handloom / Cultural Stores',
-    ],
-  },
+    id: "other",
+    name: "Other",
+    subcategories: ["Handmade", "Vintage", "Collectibles", "Custom Items", "Import/Export", "Wholesale"]
+  }
 ];
 
+// Simple categories for product form (without subcategories)
+export const CATEGORIES = [
+  "Professional Services",
+  "Electronics",
+  "Fashion & Apparel", 
+  "Home & Living",
+  "Beauty & Wellness",
+  "Food & Grocery",
+  "Digital / Software",
+  "Health & Therapy",
+  "Automotive",
+  "Other"
+];
+
+// Functions for seller signup form
+export const getSubcategoriesByCategory = (categoryId: string) => {
+  const category = CATEGORIES_WITH_SUBCATEGORIES.find(cat => cat.id === categoryId);
+  return category ? category.subcategories : [];
+};
+
 export const getCategoryById = (id: string) => {
-  return CATEGORIES.find(cat => cat.id === id);
+  return CATEGORIES_WITH_SUBCATEGORIES.find(cat => cat.id === id);
 };
 
 export const getCategoryByName = (name: string) => {
-  return CATEGORIES.find(cat => cat.name === name);
+  return CATEGORIES_WITH_SUBCATEGORIES.find(cat => cat.name === name);
 };
 
 export const getAllCategories = () => {
-  return CATEGORIES.map(cat => ({
-    id: cat.id,
-    name: cat.name
-  }));
-};
-
-export const getSubcategoriesByCategory = (categoryId: string) => {
-  const category = getCategoryById(categoryId);
-  return category ? category.subcategories : [];
+  return CATEGORIES_WITH_SUBCATEGORIES;
 }; 

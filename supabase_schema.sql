@@ -78,6 +78,49 @@ CREATE TABLE "products" (
     "inStock" BOOLEAN DEFAULT TRUE,
     "isActive" BOOLEAN DEFAULT TRUE,
     "sellerId" INTEGER NOT NULL REFERENCES "sellers"("id") ON DELETE CASCADE,
+    
+    -- New fields for comprehensive product form
+    "productType" TEXT DEFAULT 'PHYSICAL', -- PHYSICAL, DIGITAL, APPOINTMENT, WALK_IN, ENQUIRY_ONLY, ONSITE_SERVICE
+    "tags" TEXT[], -- Array of tags
+    "images" TEXT[], -- Array of image URLs
+    
+    -- Pricing fields
+    "discountPercent" NUMERIC(5,2), -- Discount percentage
+    
+    -- Inventory fields
+    "sku" TEXT, -- Stock Keeping Unit
+    "unit" TEXT DEFAULT 'piece', -- Unit of measurement
+    "customUnit" TEXT, -- Custom unit if not in standard list
+    
+    -- Product type specific fields
+    "downloadUrl" TEXT, -- For digital products
+    "accessInstructions" TEXT, -- For digital products
+    "serviceName" TEXT, -- For appointment/onsite services
+    "duration" INTEGER, -- Duration in minutes for appointments
+    "calendlyLink" TEXT, -- For appointments
+    "location" TEXT, -- For walk-in services
+    "hours" TEXT, -- Business hours for walk-in
+    "instructions" TEXT, -- Instructions for walk-in/onsite
+    "contactEmail" TEXT, -- For enquiry only
+    "contactPhone" TEXT, -- For enquiry only
+    
+    -- SEO fields
+    "keyword" TEXT,
+    "slug" TEXT,
+    "seoTags" TEXT[],
+    "seoDescription" TEXT,
+    "features" TEXT[],
+    "seoScore" INTEGER DEFAULT 0,
+    
+    -- Delivery fields (only for physical products)
+    "isDeliveryEnabled" BOOLEAN DEFAULT TRUE,
+    "deliveryRadius" INTEGER DEFAULT 10, -- in kilometers
+    "deliveryFee" NUMERIC(10,2) DEFAULT 0,
+    "minOrderAmount" NUMERIC(10,2) DEFAULT 0,
+    
+    -- Variants (JSON for physical products)
+    "variants" JSONB, -- Array of variant objects with size, color, stock, price
+    
     "created_at" TIMESTAMP DEFAULT NOW(),
     "updated_at" TIMESTAMP DEFAULT NOW()
 );
