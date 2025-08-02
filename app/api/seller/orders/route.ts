@@ -10,6 +10,8 @@ export async function GET(request: NextRequest) {
   const to = from + limit - 1
   const debug = searchParams.get("debug")
 
+  console.log('[SELLER ORDERS API] Request params:', { sellerId, page, limit, from, to, debug })
+
   if (debug === "1") {
     // Return all seller_orders for debugging
     const { data: allOrders, error } = await supabase
@@ -17,8 +19,10 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('created_at', { ascending: false })
     if (error) {
+      console.error('[SELLER ORDERS API DEBUG] Error fetching all orders:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+    console.log('[SELLER ORDERS API DEBUG] All orders:', allOrders)
     return NextResponse.json({ orders: allOrders })
   }
 
@@ -27,6 +31,34 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // First, check if seller exists
+    const { data: seller, error: sellerError } = await supabase
+      .from('sellers')
+      .select('id, name, email')
+      .eq('id', Number(sellerId))
+      .single()
+    
+    if (sellerError || !seller) {
+      console.error('[SELLER ORDERS API] Seller not found:', sellerId, sellerError)
+      return NextResponse.json({ error: "Seller not found" }, { status: 404 })
+    }
+    
+    console.log('[SELLER ORDERS API] Found seller:', seller)
+
+    // Check if there are any seller_orders for this seller
+    const { data: basicSellerOrders, error: basicError } = await supabase
+      .from('seller_orders')
+      .select('id, orderId, sellerId, status, created_at')
+      .eq('sellerId', Number(sellerId))
+      .order('created_at', { ascending: false })
+    
+    if (basicError) {
+      console.error('[SELLER ORDERS API] Error fetching basic seller orders:', basicError)
+      return NextResponse.json({ error: basicError.message }, { status: 500 })
+    }
+    
+    console.log('[SELLER ORDERS API] Basic seller orders found:', basicSellerOrders?.length || 0)
+
     // Get orders for this seller with complete order details
     const { data: sellerOrders, error, count } = await supabase
       .from('seller_orders')
@@ -70,7 +102,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message, details: error }, { status: 500 })
     }
     
-    console.log('[DEBUG] Seller orders fetched for seller:', sellerOrders)
+    console.log('[SELLER ORDERS API] Full seller orders fetched:', sellerOrders?.length || 0)
+    console.log('[SELLER ORDERS API] Sample order data:', sellerOrders?.[0])
     
     // Transform the data to flatten the structure
     const transformedOrders = sellerOrders?.map(sellerOrder => {
@@ -106,6 +139,8 @@ export async function GET(request: NextRequest) {
       }
     }) || []
     
+    console.log('[SELLER ORDERS API] Transformed orders:', transformedOrders.length)
+    
     return NextResponse.json({
       orders: transformedOrders,
       pagination: {
@@ -113,6 +148,12 @@ export async function GET(request: NextRequest) {
         limit,
         total: count,
         totalPages: Math.ceil((count || 0) / limit)
+      },
+      debug: {
+        sellerId: Number(sellerId),
+        basicOrdersCount: basicSellerOrders?.length || 0,
+        fullOrdersCount: sellerOrders?.length || 0,
+        transformedCount: transformedOrders.length
       }
     })
   } catch (error) {

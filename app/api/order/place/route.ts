@@ -3,8 +3,10 @@ import { supabase, createOrder, createSellerOrder, createPayment } from "@/lib/d
 import { realtimeManager } from "@/lib/realtime"
 
 export async function POST(request: NextRequest) {
+  console.log("API endpoint called")
   try {
     const body = await request.json()
+    console.log("API received body:", body)
     const { 
       customerId, 
       items, 
@@ -18,11 +20,13 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (!customerId || !items || !customerDetails || !paymentMethod || !totalAmount) {
+      console.log("Validation failed:", { customerId, items: items?.length, customerDetails, paymentMethod, totalAmount })
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
     // Group items by seller
     const itemsBySeller = new Map()
+    console.log("Processing items:", items)
     for (const item of items) {
       try {
         console.debug('[DEBUG] Looking up product', item.productId)
@@ -81,7 +85,7 @@ export async function POST(request: NextRequest) {
           totalPrice: item.price * item.quantity,
           productName: item.name,
           productImage: item.image,
-          productCategory: item.category
+          productCategory: item.category || "general"
         }))
       })
     } catch (err) {

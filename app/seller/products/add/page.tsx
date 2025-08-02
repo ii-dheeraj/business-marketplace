@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Upload, X, Save, Eye, Plus, Tag, Image as ImageIcon } from "lucide-react"
+import { AppointmentCalendar } from "@/components/ui/appointment-calendar"
+import { AppointmentScheduleForm } from "@/components/ui/appointment-schedule-form"
+import { ArrowLeft, Upload, X, Save, Eye, Plus, Tag, Image as ImageIcon, Settings } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getCookie } from "@/lib/utils"
@@ -49,6 +51,24 @@ interface Product {
   serviceName?: string
   duration?: number
   calendlyLink?: string
+  appointmentDate?: Date
+  appointmentTime?: string
+  appointmentConfig?: {
+    timezone: string
+    weeklyAvailability: {
+      [key: string]: {
+        enabled: boolean
+        from: string
+        to: string
+      }
+    }
+    blockedDates: Array<{
+      id: string
+      from: string
+      to: string
+      label?: string
+    }>
+  }
   location?: string
   hours?: string
   instructions?: string
@@ -95,6 +115,21 @@ export default function AddProduct() {
     serviceName: "",
     duration: 30,
     calendlyLink: "",
+    appointmentDate: undefined as Date | undefined,
+    appointmentTime: "",
+    appointmentConfig: {
+      timezone: "Asia/Singapore",
+      weeklyAvailability: {
+        Monday: { enabled: false, from: "09:00", to: "17:00" },
+        Tuesday: { enabled: false, from: "09:00", to: "17:00" },
+        Wednesday: { enabled: false, from: "09:00", to: "17:00" },
+        Thursday: { enabled: false, from: "09:00", to: "17:00" },
+        Friday: { enabled: false, from: "09:00", to: "17:00" },
+        Saturday: { enabled: false, from: "09:00", to: "17:00" },
+        Sunday: { enabled: false, from: "09:00", to: "17:00" }
+      },
+      blockedDates: []
+    },
     location: "",
     hours: "",
     instructions: "",
@@ -120,6 +155,7 @@ export default function AddProduct() {
   const [isDraftSaved, setIsDraftSaved] = useState(false)
   const [showSeoPreview, setShowSeoPreview] = useState(false)
   const [error, setError] = useState("")
+
 
   const handleRemoveImage = (imageId: string) => {
     setImages((prev) => prev.filter((image) => image.id !== imageId))
@@ -379,22 +415,16 @@ export default function AddProduct() {
     setError("");
     if (!sellerInfo) return;
 
-    // Validate required fields based on product type
-    if (productData.productType === 'physical') {
-      if (!productData.name || !productData.price || !productData.stock) {
-        setError("Please fill in all required fields for physical products");
-        return;
-      }
-    } else if (productData.productType === 'digital') {
-      if (!productData.name || !productData.price || !productData.downloadUrl) {
-        setError("Please fill in all required fields for digital products");
-        return;
-      }
-    } else if (productData.productType === 'appointment') {
-      if (!productData.name || !productData.serviceName || !productData.calendlyLink) {
-        setError("Please fill in all required fields for appointments");
-        return;
-      }
+    // Only essential validation - name is required
+    if (!productData.name || !productData.name.trim()) {
+      setError("Product/Service name is required");
+      return;
+    }
+
+    // Optional validations with warnings only
+    if (productData.price && Number(productData.price) < 0) {
+      setError("Price cannot be negative");
+      return;
     }
 
     const payload = {
@@ -403,6 +433,8 @@ export default function AddProduct() {
       sellerId: sellerInfo.id
     };
 
+    console.log("[PRODUCT FORM] Submitting payload:", payload);
+
     const res = await fetch("/api/product", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -410,14 +442,29 @@ export default function AddProduct() {
     });
     
     const data = await res.json();
+    console.log("[PRODUCT FORM] API response:", data);
+    
     if (res.ok) {
       // Reset form
       setProductData({
         name: "", description: "", category: "", price: "", originalPrice: "", stock: "", 
         tags: [], productType: "physical", variants: [], downloadUrl: "", accessInstructions: "", 
-        serviceName: "", duration: 30, calendlyLink: "", location: "", hours: "", instructions: "", 
-        contactEmail: "", contactPhone: "", keyword: "", slug: "", seoTags: [], seoDescription: "", 
-        features: [], seoScore: 0, sku: "", unit: "pcs", customUnit: ""
+        serviceName: "", duration: 30, calendlyLink: "", appointmentDate: undefined, appointmentTime: "", 
+        appointmentConfig: {
+          timezone: "Asia/Singapore",
+          weeklyAvailability: {
+            Monday: { enabled: false, from: "09:00", to: "17:00" },
+            Tuesday: { enabled: false, from: "09:00", to: "17:00" },
+            Wednesday: { enabled: false, from: "09:00", to: "17:00" },
+            Thursday: { enabled: false, from: "09:00", to: "17:00" },
+            Friday: { enabled: false, from: "09:00", to: "17:00" },
+            Saturday: { enabled: false, from: "09:00", to: "17:00" },
+            Sunday: { enabled: false, from: "09:00", to: "17:00" }
+          },
+          blockedDates: []
+        },
+        location: "", hours: "", instructions: "", contactEmail: "", contactPhone: "", keyword: "", 
+        slug: "", seoTags: [], seoDescription: "", features: [], seoScore: 0, sku: "", unit: "pcs", customUnit: ""
       });
       setImages([]);
       setVariantItems('');
@@ -732,7 +779,8 @@ export default function AddProduct() {
               )}
 
               {productData.productType === 'appointment' && (
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  {/* Service Details */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="serviceName">Service Name *</Label>
@@ -758,17 +806,15 @@ export default function AddProduct() {
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="calendlyLink">Calendly Link *</Label>
-                    <Input
-                      id="calendlyLink"
-                      type="url"
-                      value={productData.calendlyLink}
-                      onChange={(e) => handleInputChange("calendlyLink", e.target.value)}
-                      placeholder="https://calendly.com/your-link"
-                      required
-                    />
-                  </div>
+
+                  {/* Comprehensive Appointment Schedule Form */}
+                  <AppointmentScheduleForm
+                    value={productData.appointmentConfig}
+                    onChange={(config) => handleInputChange("appointmentConfig", config)}
+                    hasBookedAppointments={false}
+                  />
+
+
                 </div>
               )}
 
@@ -1068,6 +1114,8 @@ export default function AddProduct() {
           </CardContent>
         </Card>
       </div>
+
+
     </div>
   )
 }

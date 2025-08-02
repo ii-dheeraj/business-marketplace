@@ -266,6 +266,7 @@ export const createOrder = async (data: {
   deliveryOTP?: string
   items: any[]
 }) => {
+  console.log("Creating order with data:", data)
   // Step 1: Create order without orderNumber
   const { data: order, error } = await supabase
     .from('orders')
@@ -289,7 +290,10 @@ export const createOrder = async (data: {
     }])
     .select()
     .single()
-  if (error) throw error
+  if (error) {
+    console.error("Error creating order:", error)
+    throw error
+  }
   // Step 2: Update orderNumber to be the running id
   const { data: updatedOrder, error: updateError } = await supabase
     .from('orders')

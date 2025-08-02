@@ -1,6 +1,6 @@
 "use client"
 
-import { CATEGORIES } from "@/utils/category-data";
+import { CATEGORIES_WITH_SUBCATEGORIES } from "@/utils/category-data";
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import Link from "next/link"
@@ -56,7 +56,7 @@ export default function BrowsePage() {
           >
             All
           </button>
-          {CATEGORIES.map((cat) => (
+          {CATEGORIES_WITH_SUBCATEGORIES.map((cat) => (
             <button
               key={cat.id}
               className={`px-4 py-2 rounded-full border text-sm font-medium whitespace-nowrap ${selectedCategory === cat.id ? "bg-blue-600 text-white" : "bg-white text-gray-700 border-gray-300"}`}

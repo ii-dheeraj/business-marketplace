@@ -46,29 +46,14 @@ export async function POST(request: NextRequest) {
       variants = []
     } = body
     
-    if (!name || !price || !sellerId) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    // Only essential validations - name and sellerId are required
+    if (!name || !sellerId) {
+      return NextResponse.json({ error: "Product name and seller ID are required" }, { status: 400 })
     }
 
-    // Validate product type specific fields
-    if (productType === 'physical' && (!stock || stock === '')) {
-      return NextResponse.json({ error: "Stock quantity is required for physical products" }, { status: 400 })
-    }
-    
-    if (productType === 'digital' && !downloadUrl) {
-      return NextResponse.json({ error: "Download URL is required for digital products" }, { status: 400 })
-    }
-    
-    if (productType === 'appointment' && (!serviceName || !calendlyLink)) {
-      return NextResponse.json({ error: "Service name and Calendly link are required for appointment products" }, { status: 400 })
-    }
-    
-    if (productType === 'walkin' && (!location || !hours)) {
-      return NextResponse.json({ error: "Location and hours are required for walk-in products" }, { status: 400 })
-    }
-    
-    if ((productType === 'enquiry' || productType === 'onsite') && (!contactEmail || !contactPhone)) {
-      return NextResponse.json({ error: "Contact email and phone are required for enquiry and onsite service products" }, { status: 400 })
+    // Optional validations with warnings only - no blocking errors
+    if (price && price < 0) {
+      return NextResponse.json({ error: "Price cannot be negative" }, { status: 400 })
     }
 
     // Delivery fields are only applicable for physical products
@@ -84,41 +69,41 @@ export async function POST(request: NextRequest) {
       minOrderAmount: 0
     }
 
-    // Prepare product data
+    // Prepare product data with flexible defaults
     const productData = {
       name,
-      description,
-      price: Number(price),
+      description: description || "",
+      price: price ? Number(price) : 0, // Allow 0 for negotiable prices
       originalPrice: originalPrice ? Number(originalPrice) : null,
       image: images.length > 0 ? images[0] : image, // Use first image from array or fallback to single image
       sellerId: Number(sellerId),
-      category,
+      category: category || "",
       stock: productType === 'physical' ? (stock ? Number(stock) : 0) : 0,
       inStock: productType === 'physical' ? ((stock ? Number(stock) : 0) > 0) : true,
       isActive: true,
       
-      // New comprehensive fields
+      // New comprehensive fields with defaults
       productType,
       tags: Array.isArray(tags) ? tags : [],
       images: Array.isArray(images) ? images : [],
       discountPercent: discountPercent ? Number(discountPercent) : null,
-      sku,
+      sku: sku || "",
       unit,
-      customUnit,
-      downloadUrl,
-      accessInstructions,
-      serviceName,
+      customUnit: customUnit || "",
+      downloadUrl: downloadUrl || "",
+      accessInstructions: accessInstructions || "",
+      serviceName: serviceName || "",
       duration: duration ? Number(duration) : null,
-      calendlyLink,
-      location,
-      hours,
-      instructions,
-      contactEmail,
-      contactPhone,
-      keyword,
-      slug,
+      calendlyLink: calendlyLink || "",
+      location: location || "",
+      hours: hours || "",
+      instructions: instructions || "",
+      contactEmail: contactEmail || "",
+      contactPhone: contactPhone || "",
+      keyword: keyword || "",
+      slug: slug || "",
       seoTags: Array.isArray(seoTags) ? seoTags : [],
-      seoDescription,
+      seoDescription: seoDescription || "",
       features: Array.isArray(features) ? features : [],
       seoScore: Number(seoScore),
       variants: Array.isArray(variants) ? variants : [],
@@ -134,27 +119,32 @@ export async function POST(request: NextRequest) {
       .single()
       
     if (createError) {
+      console.error("[PRODUCT API] Database error:", createError)
       return NextResponse.json({ error: createError.message }, { status: 500 })
     }
     
     // Send real-time notification to seller
     try {
       await realtimeManager.sendNotification(String(sellerId), {
-        type: 'notification',
-        title: 'Product Added',
-        message: `A new ${productType.toLowerCase()} product (ID: ${product.id}) was added.`,
+        type: 'order_update',
+        title: 'Product Added Successfully! 🎉',
+        message: `Your ${productType.toLowerCase()} product "${name}" has been added successfully.`,
         data: product,
         timestamp: new Date(),
         userId: String(sellerId)
       })
     } catch (notifyErr) {
       console.error("[API] Failed to send real-time notification to seller:", sellerId, notifyErr)
+      // Don't fail the product creation if notification fails
     }
     
-    return NextResponse.json({ success: true, product })
+    return NextResponse.json({ 
+      success: true, 
+      product
+    })
   } catch (error) {
-    console.error("Error adding product:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[PRODUCT API] Unexpected error:", error)
+    return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 })
   }
 }
 
