@@ -225,19 +225,20 @@ export default function BusinessPage() {
 
         {/* Hero Image Section */}
         <div className="relative h-[200px] md:h-[250px] w-full bg-gray-100 rounded-2xl shadow-[0px_4px_20px_rgba(0,0,0,0.1)] mb-6 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/80 to-purple-600/80"></div>
+          {/* Business Image */}
+          <Image
+            src={business.image || "/placeholder.svg"}
+            alt={business.name}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              console.log("[DEBUG] Business image failed to load:", business.name, "image:", business.image)
+              e.currentTarget.src = "/placeholder.svg"
+            }}
+          />
           
-          {/* Centered Icon */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="relative">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <Building2 className="h-8 w-8 text-white" />
-              </div>
-              {/* Radiating circles */}
-              <div className="absolute inset-0 w-16 h-16 border border-white/30 rounded-full animate-pulse"></div>
-              <div className="absolute inset-0 w-20 h-20 border border-white/20 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
-            </div>
-          </div>
+          {/* Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
 
           {/* Business Name */}
           <div className="absolute bottom-4 left-4">
@@ -256,7 +257,7 @@ export default function BusinessPage() {
 
           {/* Category Badge */}
           <div className="absolute top-4 right-4">
-            <Badge className="bg-white/10 text-white border-white border px-3 py-1 rounded-full text-xs">
+            <Badge className="bg-white/10 text-white border-white border px-3 py-1 rounded-full text-xs backdrop-blur-sm">
               {business.categoryName || business.category}
             </Badge>
           </div>
