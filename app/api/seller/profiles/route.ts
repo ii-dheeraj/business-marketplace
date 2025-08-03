@@ -1,24 +1,58 @@
-import { NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/database"
-import { getCategoryById } from "@/utils/category-data"
+
+// Helper function to get category name by ID
+function getCategoryById(categoryId: string) {
+  const categories = {
+    'electronics': { name: 'Electronics', icon: '📱' },
+    'fashion': { name: 'Fashion', icon: '👕' },
+    'home-garden': { name: 'Home & Garden', icon: '🏠' },
+    'services': { name: 'Services', icon: '🔧' },
+    'digital-products': { name: 'Digital Products', icon: '💻' },
+    'food-beverages': { name: 'Food & Beverages', icon: '🍕' },
+    'health-beauty': { name: 'Health & Beauty', icon: '💄' },
+    'sports-outdoors': { name: 'Sports & Outdoors', icon: '⚽' },
+    'books-media': { name: 'Books & Media', icon: '📚' },
+    'automotive': { name: 'Automotive', icon: '🚗' }
+  }
+  return categories[categoryId as keyof typeof categories] || { name: categoryId, icon: '🏪' }
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
-    const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : 10
     const featured = searchParams.get("featured") === "true"
-    
+    const limit = parseInt(searchParams.get("limit") || "10")
+
+    console.log("[DEBUG] Seller profiles API called with params:", { id, featured, limit })
+
     if (id) {
-      // Get a single seller profile by id
+      // Get single seller profile
       const { data: seller, error } = await supabase
         .from('sellers')
-        .select('*, products(*)')
+        .select(`
+          *,
+          products(
+            id,
+            title,
+            description,
+            type,
+            category,
+            subcategory,
+            is_active,
+            created_at,
+            product_pricing(selling_price, original_price, quantity_available, is_in_stock),
+            product_images(image_url, is_primary)
+          )
+        `)
         .eq('id', id)
         .single()
-      
+
+      console.debug("[DEBUG] Raw seller data from DB:", seller)
+
       if (error || !seller) {
-        console.error("[DEBUG] Seller not found or error:", error)
+        console.error("[DEBUG] Seller not found:", id, error)
         return NextResponse.json({ error: "Seller not found" }, { status: 404 })
       }
 
@@ -77,21 +111,29 @@ export async function GET(request: NextRequest) {
         totalOrders,
         totalRevenue,
         averageOrderValue,
-                 products: Array.isArray(seller.products) ? seller.products.map((product: any) => ({
-           id: product.id,
-           name: product.title || product.name || '',
-           description: product.description || '',
-           price: product.selling_price ?? 0,
-           originalPrice: product.original_price ?? 0,
-           image: product.image_url || product.image || '/placeholder.svg',
-           category: product.category || '',
-           subcategory: product.subcategory || '',
-           stock: product.quantity_available ?? 0,
-           inStock: product.is_in_stock ?? true
-         })) : []
+        products: Array.isArray(seller.products) ? seller.products.map((product: any) => {
+          const pricing = product.product_pricing?.[0] || {}
+          const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+          
+          return {
+            id: product.id,
+            name: product.title || product.name || '',
+            description: product.description || '',
+            price: pricing.selling_price ?? 0,
+            originalPrice: pricing.original_price ?? 0,
+            image: primaryImage?.image_url || product.image || '/placeholder.svg',
+            category: product.category || '',
+            subcategory: product.subcategory || '',
+            stock: pricing.quantity_available ?? 0,
+            inStock: pricing.is_in_stock ?? true,
+            type: product.type || 'physical'
+          }
+        }) : []
       }
 
       console.debug("[DEBUG] Single seller profile formatted:", formattedSeller)
+      console.debug("[DEBUG] Raw business_description from DB:", seller.business_description)
+      console.debug("[DEBUG] Mapped description field:", formattedSeller.description)
       return NextResponse.json({ seller: formattedSeller })
     }
 
@@ -141,31 +183,31 @@ export async function GET(request: NextRequest) {
         subcategories: subcategories,
         description: s.business_description || '',
         image: s.business_image || '/placeholder.svg',
-                 city: s.business_city || '',
-         area: s.business_area || '',
-         locality: s.business_locality || '',
-         state: s.business_state || '',
-         pincode: s.business_pincode || '',
-         address: s.business_address || '',
-         openingHours: s.opening_hours || '',
+        city: s.business_city || '',
+        area: s.business_area || '',
+        locality: s.business_locality || '',
+        state: s.business_state || '',
+        pincode: s.business_pincode || '',
+        address: s.business_address || '',
         rating: s.rating ?? 0,
-                 reviews: s.total_reviews ?? 0,
-         deliveryTime: s.delivery_time || "30-45 min",
-         isVerified: s.is_verified ?? false,
-         isPromoted: s.is_promoted ?? false,
-         isOpen: s.is_open ?? true,
-        totalProducts: 0, // Will be calculated separately if needed
-        totalOrders: 0, // Will be calculated separately if needed
-        totalRevenue: 0, // Will be calculated separately if needed
-        averageOrderValue: 0, // Will be calculated separately if needed
-        products: [] // Will be fetched separately if needed
+        reviews: s.total_reviews ?? 0,
+        deliveryTime: s.delivery_time || '30-45 min',
+        isVerified: s.is_verified ?? false,
+        isPromoted: s.is_promoted ?? false,
+        isOpen: s.is_open ?? true
       }
     })
 
-    console.debug("[DEBUG] Formatted seller profiles:", formatted)
+    console.debug("[DEBUG] Formatted sellers:", formatted)
+    console.debug("[DEBUG] Sample seller business_description:", sellers?.[0]?.business_description)
+    console.debug("[DEBUG] Sample mapped description:", formatted?.[0]?.description)
     return NextResponse.json({ sellers: formatted })
+
   } catch (error) {
-    console.error("Seller profiles API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[DEBUG] Unexpected error in seller profiles API:", error)
+    return NextResponse.json({ 
+      error: "Internal server error", 
+      details: error instanceof Error ? error.message : String(error) 
+    }, { status: 500 })
   }
 } 

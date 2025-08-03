@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import EnhancedOrderDetailsModal from "@/components/enhanced-order-details-modal"
+import OrderDetailsModal from "@/components/order-details-modal"
 
 import {
   Package,
@@ -1340,7 +1340,7 @@ export default function SellerDashboard() {
       )}
 
       {/* Order Details Modal */}
-      <EnhancedOrderDetailsModal
+      <OrderDetailsModal
         isOpen={isOrderModalOpen}
         onClose={handleOrderModalClose}
         order={selectedOrder}

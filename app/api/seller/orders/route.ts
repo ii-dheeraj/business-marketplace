@@ -1,40 +1,25 @@
-import { NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/database"
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const sellerId = searchParams.get("sellerId")
-  const page = parseInt(searchParams.get("page") || "1")
-  const limit = parseInt(searchParams.get("limit") || "10")
-  const from = (page - 1) * limit
-  const to = from + limit - 1
-  const debug = searchParams.get("debug")
-
-  console.log('[SELLER ORDERS API] Request params:', { sellerId, page, limit, from, to, debug })
-
-  if (debug === "1") {
-    // Return all seller_orders for debugging
-    const { data: allOrders, error } = await supabase
-      .from('seller_orders')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) {
-      console.error('[SELLER ORDERS API DEBUG] Error fetching all orders:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-    console.log('[SELLER ORDERS API DEBUG] All orders:', allOrders)
-    return NextResponse.json({ orders: allOrders })
-  }
-
-  if (!sellerId) {
-    return NextResponse.json({ error: "Seller ID is required" }, { status: 400 })
-  }
-
   try {
-    // First, check if seller exists
+    const { searchParams } = new URL(request.url)
+    const sellerId = searchParams.get("sellerId")
+    const page = parseInt(searchParams.get("page") || "1")
+    const limit = parseInt(searchParams.get("limit") || "10")
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+
+    console.log('[SELLER ORDERS API] Request params:', { sellerId, page, limit })
+
+    if (!sellerId) {
+      return NextResponse.json({ error: "Seller ID is required" }, { status: 400 })
+    }
+
+    // Verify seller exists
     const { data: seller, error: sellerError } = await supabase
       .from('sellers')
-      .select('id, name, email')
+      .select('id, name, business_name')
       .eq('id', sellerId)
       .single()
     
@@ -148,16 +133,69 @@ export async function GET(request: NextRequest) {
         limit,
         total: count,
         totalPages: Math.ceil((count || 0) / limit)
-      },
-      debug: {
-        sellerId: Number(sellerId),
-        basicOrdersCount: basicSellerOrders?.length || 0,
-        fullOrdersCount: sellerOrders?.length || 0,
-        transformedCount: transformedOrders.length
       }
     })
   } catch (error) {
-    console.error('[SELLER ORDERS API UNEXPECTED ERROR]', error)
-    return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 })
+    console.error('[SELLER ORDERS API] Unexpected error:', error)
+    return NextResponse.json({ 
+      error: "Internal server error", 
+      details: error instanceof Error ? error.message : String(error) 
+    }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { orderId, status } = body
+
+    if (!orderId || !status) {
+      return NextResponse.json({ error: "Order ID and status are required" }, { status: 400 })
+    }
+
+    console.log('[SELLER ORDERS API] Updating seller order:', orderId, { status })
+
+    // Update seller order status
+    const { data: sellerOrder, error } = await supabase
+      .from('seller_orders')
+      .update({ status })
+      .eq('id', orderId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[SELLER ORDERS API] Update error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Also update the main order status if this is the only seller order
+    // or if all seller orders have the same status
+    const { data: allSellerOrders } = await supabase
+      .from('seller_orders')
+      .select('status')
+      .eq('order_id', sellerOrder.order_id)
+
+    if (allSellerOrders && allSellerOrders.length > 0) {
+      const allSameStatus = allSellerOrders.every(so => so.status === status)
+      if (allSameStatus) {
+        await supabase
+          .from('orders')
+          .update({ order_status: status })
+          .eq('id', sellerOrder.order_id)
+      }
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      sellerOrder,
+      message: "Seller order updated successfully" 
+    })
+
+  } catch (error) {
+    console.error('[SELLER ORDERS API] Update error:', error)
+    return NextResponse.json({ 
+      error: "Failed to update seller order", 
+      details: error instanceof Error ? error.message : String(error) 
+    }, { status: 500 })
   }
 } 

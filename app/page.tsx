@@ -27,6 +27,7 @@ import { CartDrawer } from "@/components/cart-drawer"
 import { useCart } from "@/hooks/useCart"
 import { useLocation } from "@/hooks/useLocation"
 import { Footer } from "@/components/ui/footer"
+import { ModernBusinessCard } from "@/components/modern-business-card"
 
 import { getCookie, deleteCookie } from "@/lib/utils"
 
@@ -178,7 +179,7 @@ export default function HomePage() {
   // Update filteredBusinesses to use businesses from state
   const filteredBusinesses = useMemo(() => {
     let filtered = businesses
-    if (location.selectedCity) {
+    if (location.selectedCity && location.selectedCity !== "All Cities") {
       filtered = filtered.filter((business: any) => business.city === location.selectedCity)
     }
     if (location.selectedArea && location.selectedArea !== "All Areas") {
@@ -186,9 +187,6 @@ export default function HomePage() {
     }
     if (location.selectedLocality) {
       filtered = filtered.filter((business: any) => business.locality === location.selectedLocality)
-    }
-    if (!location.selectedCity) {
-      return filtered.slice(0, 6)
     }
     return filtered.sort((a: any, b: any) => {
       if (a.promoted && !b.promoted) return -1
@@ -199,7 +197,7 @@ export default function HomePage() {
 
   // Filter job postings based on selected city
   const filteredJobs = useMemo(() => {
-    if (!location.selectedCity) return jobPostingsData.slice(0, 3) // Show first 3 if no city selected
+    if (!location.selectedCity || location.selectedCity === "All Cities") return jobPostingsData.slice(0, 3) // Show first 3 if no city selected
     return jobPostingsData.filter((job) => job.city === location.selectedCity)
   }, [location.selectedCity])
 
@@ -224,7 +222,7 @@ export default function HomePage() {
     console.log("[DEBUG] Home page search triggered with query:", searchQuery)
     const params = new URLSearchParams()
     if (searchQuery) params.set("q", searchQuery)
-    if (location.selectedCity) params.set("city", location.selectedCity)
+    if (location.selectedCity && location.selectedCity !== "All Cities") params.set("city", location.selectedCity)
     if (location.selectedArea && location.selectedArea !== "All Areas") params.set("area", location.selectedArea)
     if (location.selectedLocality) params.set("locality", location.selectedLocality)
 
@@ -264,9 +262,9 @@ export default function HomePage() {
   ]
 
   const localities = ((
-    locationData[location.selectedCity as keyof typeof locationData]?.areas[
+    location.selectedCity !== "All Cities" ? locationData[location.selectedCity as keyof typeof locationData]?.areas[
       location.selectedArea as keyof (typeof locationData)[keyof typeof locationData]["areas"]
-    ] || []
+    ] || [] : []
   ) as string[]).map((locality: string) => (
     <DropdownMenuItem key={locality} onClick={() => handleLocalityChange(locality)}>
       {locality}
@@ -304,9 +302,10 @@ export default function HomePage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-64">
-                  {!location.selectedCity ? (
+                  {!location.selectedCity || location.selectedCity === "All Cities" ? (
                     <>
                       <div className="px-2 py-1 text-sm font-medium text-gray-500">Popular Cities</div>
+                      <DropdownMenuItem onClick={() => handleCityChange("All Cities")}>All Cities</DropdownMenuItem>
                       {Object.keys(locationData).map((city) => (
                         <DropdownMenuItem key={city} onClick={() => handleCityChange(city)}>
                           {city}
@@ -317,18 +316,18 @@ export default function HomePage() {
                     <>
                       <div className="px-2 py-1 text-sm font-medium text-gray-500 flex items-center justify-between">
                         Areas in {location.selectedCity}
-                        <Button variant="ghost" size="sm" onClick={() => setCity("")}>
+                        <Button variant="ghost" size="sm" onClick={() => setCity("All Cities")}>
                           Change City
                         </Button>
                       </div>
                       <DropdownMenuItem onClick={() => handleAreaChange("All Areas")}>All Areas</DropdownMenuItem>
-                      {Object.keys(locationData[location.selectedCity as keyof typeof locationData]?.areas || {}).map(
+                      {location.selectedCity !== "All Cities" ? Object.keys(locationData[location.selectedCity as keyof typeof locationData]?.areas || {}).map(
                         (area) => (
                           <DropdownMenuItem key={area} onClick={() => handleAreaChange(area)}>
                             {area}
                           </DropdownMenuItem>
                         ),
-                      )}
+                      ) : []}
                     </>
                   ) : (
                     <>
@@ -375,7 +374,7 @@ export default function HomePage() {
             {categories.map((category) => (
               <Link
                 key={category.name}
-                href={`/browse?category=${category.name.toLowerCase()}${location.selectedCity ? `&city=${location.selectedCity}` : ""}${location.selectedArea && location.selectedArea !== "All Areas" ? `&area=${location.selectedArea}` : ""}${location.selectedLocality ? `&locality=${location.selectedLocality}` : ""}`}
+                href={`/browse?category=${category.name.toLowerCase()}${location.selectedCity && location.selectedCity !== "All Cities" ? `&city=${location.selectedCity}` : ""}${location.selectedArea && location.selectedArea !== "All Areas" ? `&area=${location.selectedArea}` : ""}${location.selectedLocality ? `&locality=${location.selectedLocality}` : ""}`}
                 className="group"
               >
                 <Card className="text-center hover:shadow-lg transition-shadow cursor-pointer">
@@ -431,92 +430,17 @@ export default function HomePage() {
           ) : filteredBusinesses.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredBusinesses.map((business: any) => (
-                <Card key={business.id} className="hover:shadow-lg transition-shadow">
-                  <div className="relative">
-                    <Image
-                      src={business.image || "/placeholder.svg"}
-                      alt={business.name}
-                      width={300}
-                      height={200}
-                      className="w-full h-48 object-cover rounded-t-lg"
-                    />
-                    {business.promoted && (
-                      <Badge className="absolute top-2 left-2 bg-yellow-500 text-yellow-900">Promoted</Badge>
-                    )}
-                  </div>
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold text-lg">{business.name}</h3>
-                      <Badge variant="outline">{business.category}</Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span>{business.rating}</span>
-                        <span>({business.reviews})</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{business.deliveryTime}</span>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-500 mb-4">
-                      📍 {business.locality}, {business.area}
-                    </div>
-
-                    {/* Quick Add Products */}
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm">Quick Add:</h4>
-                      {business.products.slice(0, 2).map((product: any) => {
-                        const quantity = getItemQuantity(product.id)
-                        return (
-                          <div key={product.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                            <div className="flex items-center gap-2">
-                              <Image
-                                src={product.image || "/placeholder.svg"}
-                                alt={product.name}
-                                width={40}
-                                height={40}
-                                className="rounded"
-                              />
-                              <div>
-                                <p className="text-sm font-medium">{product.name}</p>
-                                <p className="text-xs text-gray-600">₹{product.price}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {quantity > 0 && (
-                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
-                                  {quantity} in cart
-                                </span>
-                              )}
-                              <Button
-                                size="sm"
-                                variant={quantity > 0 ? "default" : "outline"}
-                                className="h-8 px-3"
-                                onClick={() => handleAddToCart(business, product)}
-                              >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add
-                              </Button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <Link href={`/business/${business.id}`}>
-                      <Button variant="outline" size="sm" className="w-full mt-3 bg-transparent">
-                        View Store
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
+                <ModernBusinessCard
+                  key={business.id}
+                  business={business}
+                  onAddToCart={handleAddToCart}
+                />
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
               <p className="text-gray-500 mb-4">No businesses found in {getLocationDisplay()}</p>
-              <Button variant="outline" onClick={() => setCity("")}>
+              <Button variant="outline" onClick={() => setCity("All Cities")}>
                 View All Cities
               </Button>
             </div>
@@ -534,7 +458,7 @@ export default function HomePage() {
                 {location.selectedCity && (
                   <span className="text-blue-600 ml-2">
                     {isLoadingContent && <Loader2 className="h-6 w-6 animate-spin inline ml-2" />}
-                    {!isLoadingContent && `in ${location.selectedCity}`}
+                    {!isLoadingContent && `in ${getLocationDisplay()}`}
                   </span>
                 )}
               </h2>
@@ -581,8 +505,8 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <p className="text-gray-500 mb-4">No job opportunities found in {location.selectedCity}</p>
-              <Button variant="outline" onClick={() => setCity("")}>
+                              <p className="text-gray-500 mb-4">No job opportunities found in {getLocationDisplay()}</p>
+              <Button variant="outline" onClick={() => setCity("All Cities")}>
                 View All Cities
               </Button>
             </div>

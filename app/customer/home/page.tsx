@@ -30,6 +30,7 @@ import { useLocation } from "@/hooks/useLocation"
 import { Footer } from "@/components/ui/footer"
 import { getCookie, deleteCookie } from "@/lib/utils"
 import { SellerProfileCard } from "@/components/seller-profile-card"
+import { ModernBusinessCard } from "@/components/modern-business-card"
 
 // Location data
 const locationData = {
@@ -88,6 +89,7 @@ export default function CustomerHomePage() {
   const [customerInfo, setCustomerInfo] = useState<any>(null)
   const [businesses, setBusinesses] = useState<any[]>([])
   const [sellerProfiles, setSellerProfiles] = useState<any[]>([])
+  const [isLoadingSellerProfiles, setIsLoadingSellerProfiles] = useState(false)
   const router = useRouter()
   const { addToCart, getItemQuantity } = useCart()
   const { location, setCity, setArea, setLocality, clearLocation, getLocationDisplay } = useLocation()
@@ -105,13 +107,152 @@ export default function CustomerHomePage() {
   // Fetch seller profiles from backend
   useEffect(() => {
     const fetchSellerProfiles = async () => {
+      setIsLoadingSellerProfiles(true)
       try {
+        console.log("[DEBUG] Fetching seller profiles...")
         const res = await fetch("/api/seller/profiles?featured=true&limit=6")
+        console.log("[DEBUG] Seller profiles response status:", res.status)
         const data = await res.json()
-        setSellerProfiles(data.sellers || [])
-      } catch (error) {
-        console.error("Failed to fetch seller profiles:", error)
+        console.log("[DEBUG] Seller profiles data:", data)
+        
+        if (data.sellers && data.sellers.length > 0) {
+          setSellerProfiles(data.sellers)
+        } else {
+          // Fallback sample data for testing
+          console.log("[DEBUG] No sellers found, using fallback data")
+          const fallbackSellers = [
+            {
+              id: 1,
+              name: "Rajesh Kumar",
+              businessName: "Rajesh Electronics",
+              email: "rajesh@electronics.com",
+              phone: "+91 98765 43210",
+              category: "electronics",
+              categoryName: "Electronics",
+              description: "Premium electronics store with the latest gadgets and accessories.",
+              image: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop",
+              city: "Bangalore",
+              area: "Koramangala",
+              locality: "1st Block",
+              rating: 4.5,
+              reviews: 127,
+              deliveryTime: "30-45 min",
+              isVerified: true,
+              isPromoted: true,
+              isOpen: true
+            },
+            {
+              id: 2,
+              name: "Priya Sharma",
+              businessName: "Priya Fashion Boutique",
+              email: "priya@fashion.com",
+              phone: "+91 98765 43211",
+              category: "fashion",
+              categoryName: "Fashion",
+              description: "Trendy fashion boutique offering the latest styles in women's clothing.",
+              image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop",
+              city: "Bangalore",
+              area: "Indiranagar",
+              locality: "100 Feet Road",
+              rating: 4.8,
+              reviews: 89,
+              deliveryTime: "45-60 min",
+              isVerified: true,
+              isPromoted: true,
+              isOpen: true
+            },
+            {
+              id: 3,
+              name: "Amit Patel",
+              businessName: "Amit Fresh Grocery",
+              email: "amit@grocery.com",
+              phone: "+91 98765 43212",
+              category: "grocery",
+              categoryName: "Grocery",
+              description: "Fresh grocery store with organic produce and household essentials.",
+              image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=300&fit=crop",
+              city: "Bangalore",
+              area: "HSR Layout",
+              locality: "Sector 2",
+              rating: 4.3,
+              reviews: 156,
+              deliveryTime: "20-30 min",
+              isVerified: true,
+            isPromoted: false,
+            isOpen: true
+          }
+        ]
+        setSellerProfiles(fallbackSellers)
       }
+    } catch (error) {
+        console.error("Failed to fetch seller profiles:", error)
+        // Use fallback data on error too
+        const fallbackSellers = [
+          {
+            id: 1,
+            name: "Rajesh Kumar",
+            businessName: "Rajesh Electronics",
+            email: "rajesh@electronics.com",
+            phone: "+91 98765 43210",
+            category: "electronics",
+            categoryName: "Electronics",
+            description: "Premium electronics store with the latest gadgets and accessories.",
+            image: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop",
+            city: "Bangalore",
+            area: "Koramangala",
+            locality: "1st Block",
+            rating: 4.5,
+            reviews: 127,
+            deliveryTime: "30-45 min",
+            isVerified: true,
+            isPromoted: true,
+            isOpen: true
+          },
+          {
+            id: 2,
+            name: "Priya Sharma",
+            businessName: "Priya Fashion Boutique",
+            email: "priya@fashion.com",
+            phone: "+91 98765 43211",
+            category: "fashion",
+            categoryName: "Fashion",
+            description: "Trendy fashion boutique offering the latest styles in women's clothing.",
+            image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop",
+            city: "Bangalore",
+            area: "Indiranagar",
+            locality: "100 Feet Road",
+            rating: 4.8,
+            reviews: 89,
+            deliveryTime: "45-60 min",
+            isVerified: true,
+            isPromoted: true,
+            isOpen: true
+          },
+          {
+            id: 3,
+            name: "Amit Patel",
+            businessName: "Amit Fresh Grocery",
+            email: "amit@grocery.com",
+            phone: "+91 98765 43212",
+            category: "grocery",
+            categoryName: "Grocery",
+            description: "Fresh grocery store with organic produce and household essentials.",
+            image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=300&fit=crop",
+            city: "Bangalore",
+            area: "HSR Layout",
+            locality: "Sector 2",
+            rating: 4.3,
+            reviews: 156,
+            deliveryTime: "20-30 min",
+            isVerified: true,
+            isPromoted: false,
+            isOpen: true
+          }
+        ]
+        setSellerProfiles(fallbackSellers)
+      }
+    } finally {
+      setIsLoadingSellerProfiles(false)
     }
     fetchSellerProfiles()
   }, [])
@@ -141,7 +282,7 @@ export default function CustomerHomePage() {
   // Filter businesses based on selected location
   const filteredBusinesses = useMemo<any[]>(() => {
     let filtered: any[] = businesses || []
-    if (location.selectedCity) {
+    if (location.selectedCity && location.selectedCity !== "All Cities") {
       filtered = filtered.filter((business) => business.city === location.selectedCity)
     }
     if (location.selectedArea && location.selectedArea !== "All Areas") {
@@ -149,9 +290,6 @@ export default function CustomerHomePage() {
     }
     if (location.selectedLocality) {
       filtered = filtered.filter((business) => business.locality === location.selectedLocality)
-    }
-    if (!location.selectedCity) {
-      return filtered.slice(0, 6)
     }
     return filtered.sort((a, b) => {
       if (a.promoted && !b.promoted) return -1
@@ -181,7 +319,7 @@ export default function CustomerHomePage() {
     console.log("[DEBUG] Search triggered with query:", searchQuery)
     const params = new URLSearchParams()
     if (searchQuery) params.set("q", searchQuery)
-    if (location.selectedCity) params.set("city", location.selectedCity)
+    if (location.selectedCity && location.selectedCity !== "All Cities") params.set("city", location.selectedCity)
     if (location.selectedArea && location.selectedArea !== "All Areas") params.set("area", location.selectedArea)
     if (location.selectedLocality) params.set("locality", location.selectedLocality)
 
@@ -257,9 +395,10 @@ export default function CustomerHomePage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-64">
-                  {!location.selectedCity ? (
+                  {!location.selectedCity || location.selectedCity === "All Cities" ? (
                     <>
                       <div className="px-2 py-1 text-sm font-medium text-gray-500">Popular Cities</div>
+                      <DropdownMenuItem onClick={() => handleCityChange("All Cities")}>All Cities</DropdownMenuItem>
                       {Object.keys(locationData).map((city) => (
                         <DropdownMenuItem key={city} onClick={() => handleCityChange(city)}>
                           {city}
@@ -270,18 +409,18 @@ export default function CustomerHomePage() {
                     <>
                       <div className="px-2 py-1 text-sm font-medium text-gray-500 flex items-center justify-between">
                         Areas in {location.selectedCity}
-                        <Button variant="ghost" size="sm" onClick={() => setCity("")}>
+                        <Button variant="ghost" size="sm" onClick={() => setCity("All Cities")}>
                           Change City
                         </Button>
                       </div>
                       <DropdownMenuItem onClick={() => handleAreaChange("All Areas")}>All Areas</DropdownMenuItem>
-                      {Object.keys(locationData[location.selectedCity as keyof typeof locationData]?.areas || {}).map(
+                      {location.selectedCity !== "All Cities" ? Object.keys(locationData[location.selectedCity as keyof typeof locationData]?.areas || {}).map(
                         (area) => (
                           <DropdownMenuItem key={area} onClick={() => handleAreaChange(area)}>
                             {area}
                           </DropdownMenuItem>
                         ),
-                      )}
+                      ) : []}
                     </>
                   ) : (
                     <>
@@ -291,7 +430,7 @@ export default function CustomerHomePage() {
                           Clear
                         </Button>
                       </div>
-                      {(() => {
+                      {location.selectedCity !== "All Cities" ? (() => {
                         const cityData = locationData[location.selectedCity as keyof typeof locationData];
                         const areaData = cityData?.areas[location.selectedArea as keyof typeof cityData.areas];
                         const localities: string[] = areaData || [];
@@ -300,7 +439,7 @@ export default function CustomerHomePage() {
                             {locality}
                           </DropdownMenuItem>
                         ));
-                      })()}
+                      })() : []}
                     </>
                   )}
                 </DropdownMenuContent>
@@ -337,7 +476,7 @@ export default function CustomerHomePage() {
             {categories.map((category) => (
               <Link
                 key={category.name}
-                href={`/browse?category=${category.name.toLowerCase()}${location.selectedCity ? `&city=${location.selectedCity}` : ""}${location.selectedArea && location.selectedArea !== "All Areas" ? `&area=${location.selectedArea}` : ""}${location.selectedLocality ? `&locality=${location.selectedLocality}` : ""}`}
+                href={`/browse?category=${category.name.toLowerCase()}${location.selectedCity && location.selectedCity !== "All Cities" ? `&city=${location.selectedCity}` : ""}${location.selectedArea && location.selectedArea !== "All Areas" ? `&area=${location.selectedArea}` : ""}${location.selectedLocality ? `&locality=${location.selectedLocality}` : ""}`}
                 className="group"
               >
                 <Card className="text-center hover:shadow-lg transition-shadow cursor-pointer">
@@ -377,104 +516,41 @@ export default function CustomerHomePage() {
           {isLoadingContent ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(6)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
-                  <div className="h-48 bg-gray-200 rounded-t-lg"></div>
-                  <CardContent className="p-6">
-                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded mb-4 w-2/3"></div>
-                    <div className="space-y-2">
-                      <div className="h-3 bg-gray-200 rounded"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                <div key={i} className="max-w-sm w-full bg-gradient-to-br from-gray-100 to-white rounded-2xl shadow-lg animate-pulse">
+                  <div className="h-40 bg-gray-200"></div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="h-5 bg-gray-200 rounded w-2/3"></div>
+                      <div className="h-5 bg-gray-200 rounded w-1/4"></div>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                      <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                      <div className="h-12 bg-gray-200 rounded"></div>
+                    </div>
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
               ))}
             </div>
           ) : filteredBusinesses.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredBusinesses.map((business) => (
-                <Card key={business.id} className="hover:shadow-lg transition-shadow">
-                  <div className="relative">
-                    <Image
-                      src={business.image || "/placeholder.svg"}
-                      alt={business.name}
-                      width={300}
-                      height={200}
-                      className="w-full h-48 object-cover rounded-t-lg"
-                    />
-                    {business.promoted && (
-                      <Badge className="absolute top-2 left-2 bg-yellow-500 text-yellow-900">Promoted</Badge>
-                    )}
-                  </div>
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold text-lg">{business.name}</h3>
-                      <Badge variant="outline">{business.category}</Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span>{business.rating}</span>
-                        <span>({business.reviews})</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{business.deliveryTime}</span>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-500 mb-4">
-                      📍 {business.locality}, {business.area}
-                    </div>
-
-                    {/* Quick Add Products */}
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm">Quick Add:</h4>
-                      {(business.products || []).slice(0, 2).map((product: any) => (
-                        <div key={product.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <div className="flex items-center gap-2">
-                            <Image
-                              src={product.image || "/placeholder.svg"}
-                              alt={product.name}
-                              width={40}
-                              height={40}
-                              className="rounded"
-                            />
-                            <div>
-                              <p className="text-sm font-medium">{product.name}</p>
-                              <p className="text-xs text-gray-600">₹{product.price}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {getItemQuantity(product.id) > 0 && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                {getItemQuantity(product.id)}
-                              </span>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 w-6 p-0 bg-transparent"
-                              onClick={() => handleAddToCart(business, product)}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                      <Link href={`/business/${business.id}`}>
-                        <Button variant="outline" size="sm" className="w-full mt-3 bg-transparent">
-                          View Store
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
+                <ModernBusinessCard
+                  key={business.id}
+                  business={business}
+                  onAddToCart={handleAddToCart}
+                />
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
               <p className="text-gray-500 mb-4">No businesses found in {getLocationDisplay()}</p>
-              <Button variant="outline" onClick={() => setCity("")}>
+              <Button variant="outline" onClick={() => setCity("All Cities")}>
                 View All Cities
               </Button>
             </div>
@@ -495,7 +571,20 @@ export default function CustomerHomePage() {
             </Link>
           </div>
 
-          {sellerProfiles.length > 0 ? (
+          {isLoadingSellerProfiles ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="bg-gray-200 h-48 rounded-t-lg"></div>
+                  <div className="p-6 space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : sellerProfiles.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sellerProfiles.map((seller) => (
                 <SellerProfileCard

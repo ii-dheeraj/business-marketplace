@@ -93,7 +93,7 @@ export const findCustomerByEmail = async (email: string) => {
   }
 }
 
-export const findCustomerById = async (id: string | number) => {
+export const findCustomerById = async (id: string) => {
   const { data: customer, error } = await supabase
     .from('customers')
     .select('*')
@@ -194,7 +194,7 @@ export const findSellerByEmail = async (email: string) => {
   }
 }
 
-export const findSellerById = async (id: string | number) => {
+export const findSellerById = async (id: string) => {
   const { data: seller, error } = await supabase
     .from('sellers')
     .select('*')
@@ -254,7 +254,7 @@ export const findDeliveryAgentByEmail = async (email: string) => {
   return agent
 }
 
-export const findDeliveryAgentById = async (id: string | number) => {
+export const findDeliveryAgentById = async (id: string) => {
   const { data: agent, error } = await supabase
     .from('delivery_agents')
     .select('*')
@@ -275,7 +275,7 @@ export const findDeliveryAgentByPhone = async (phone: string) => {
 }
 
 // User session storage functions
-export const storeUserSession = async (userType: string, userId: string | number) => {
+export const storeUserSession = async (userType: string, userId: string) => {
   let userData: any = null
 
   if (userType === 'CUSTOMER') {
@@ -338,7 +338,7 @@ export const storeUserSession = async (userType: string, userId: string | number
 
 // Order functions
 export const createOrder = async (data: {
-  customerId: string | number
+  customerId: string
   customerName: string
   customerPhone: string
   customerAddress: string
@@ -355,11 +355,15 @@ export const createOrder = async (data: {
   items: any[]
 }) => {
   console.log("Creating order with data:", data)
-  // Step 1: Create order without orderNumber
+  
+  // Generate order number
+  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  
+  // Step 1: Create order
   const { data: order, error } = await supabase
     .from('orders')
     .insert([{
-      order_number: 'temp',
+      order_number: orderNumber,
       customer_id: data.customerId,
       customer_name: data.customerName,
       customer_phone: data.customerPhone,
@@ -373,8 +377,8 @@ export const createOrder = async (data: {
       total_amount: data.totalAmount,
       payment_method: data.paymentMethod,
       delivery_instructions: data.deliveryInstructions,
-      parcel_otp: data.deliveryOTP, // Store the delivery OTP
-      order_status: 'PENDING', // Changed from 'CONFIRMED' to 'PENDING'
+      parcel_otp: data.deliveryOTP,
+      order_status: 'PENDING',
     }])
     .select()
     .single()
@@ -382,14 +386,7 @@ export const createOrder = async (data: {
     console.error("Error creating order:", error)
     throw error
   }
-  // Step 2: Update orderNumber to be the running id
-  const { data: updatedOrder, error: updateError } = await supabase
-    .from('orders')
-    .update({ order_number: order.id.toString() })
-    .eq('id', order.id)
-    .select()
-    .single()
-  if (updateError) throw updateError
+  
   // Insert order items
   for (const item of data.items) {
     await supabase.from('order_items').insert({
@@ -403,12 +400,12 @@ export const createOrder = async (data: {
       product_category: item.productCategory
     })
   }
-  return updatedOrder
+  return order
 }
 
 export const createSellerOrder = async (data: {
-  orderId: string | number
-  sellerId: string | number
+  orderId: string
+  sellerId: string
   items: any[]
   subtotal: number
   commission: number
@@ -431,8 +428,8 @@ export const createSellerOrder = async (data: {
 }
 
 export const createPayment = async (data: {
-  orderId: string | number
-  userId: string | number
+  orderId: string
+  userId: string
   amount: number
   paymentMethod: string
   transactionId?: string
@@ -456,10 +453,137 @@ export const createPayment = async (data: {
   return payment
 }
 
+// Product functions for new schema
+export const createProduct = async (data: {
+  sellerId: string
+  title: string
+  description?: string
+  type: 'physical' | 'digital' | 'appointment' | 'walkin' | 'enquire'
+  category?: string
+  subcategory?: string
+  slug?: string
+  tags?: string[]
+  keywords?: string[]
+  seoDescription?: string
+  originalPrice?: number
+  sellingPrice: number
+  discountPercent?: number
+  unitLabel?: string
+  customUnit?: string
+  sku?: string
+  quantityAvailable?: number
+  minOrderQuantity?: number
+  maxOrderQuantity?: number
+  isInStock?: boolean
+  lowStockThreshold?: number
+  images?: string[]
+  isActive?: boolean
+  isFeatured?: boolean
+  isPromoted?: boolean
+}) => {
+  try {
+    // Create product first
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .insert([{
+        seller_id: data.sellerId,
+        title: data.title,
+        description: data.description,
+        type: data.type,
+        category: data.category,
+        subcategory: data.subcategory,
+        slug: data.slug,
+        tags: data.tags || [],
+        keywords: data.keywords || [],
+        seo_description: data.seoDescription,
+        is_active: data.isActive ?? true,
+        is_featured: data.isFeatured ?? false,
+        is_promoted: data.isPromoted ?? false
+      }])
+      .select()
+      .single()
 
+    if (productError) throw productError
+
+    // Create pricing
+    const { error: pricingError } = await supabase
+      .from('product_pricing')
+      .insert([{
+        product_id: product.id,
+        original_price: data.originalPrice,
+        selling_price: data.sellingPrice,
+        discount_percent: data.discountPercent,
+        unit_label: data.unitLabel || 'piece',
+        custom_unit: data.customUnit,
+        sku: data.sku,
+        quantity_available: data.quantityAvailable || 0,
+        min_order_quantity: data.minOrderQuantity || 1,
+        max_order_quantity: data.maxOrderQuantity,
+        is_in_stock: data.isInStock ?? true,
+        low_stock_threshold: data.lowStockThreshold || 5
+      }])
+
+    if (pricingError) {
+      console.error('Pricing creation error:', pricingError)
+      // Continue anyway as pricing is optional
+    }
+
+    // Create images
+    if (data.images && data.images.length > 0) {
+      const imageData = data.images.map((url, index) => ({
+        product_id: product.id,
+        image_url: url,
+        alt_text: data.title,
+        is_primary: index === 0,
+        sort_order: index
+      }))
+
+      const { error: imageError } = await supabase
+        .from('product_images')
+        .insert(imageData)
+
+      if (imageError) {
+        console.error('Image creation error:', imageError)
+        // Continue anyway as images are optional
+      }
+    }
+
+    return product
+  } catch (error) {
+    console.error('Product creation error:', error)
+    throw error
+  }
+}
+
+export const getProductWithDetails = async (productId: string) => {
+  try {
+    const { data: product, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_pricing(*),
+        product_images(*),
+        product_variants(*),
+        variant_combinations(*),
+        digital_product_details(*),
+        appointment_product_details(*),
+        walkin_product_details(*),
+        enquiry_form_details(*),
+        product_delivery_settings(*)
+      `)
+      .eq('id', productId)
+      .single()
+
+    if (error) throw error
+    return product
+  } catch (error) {
+    console.error('Error fetching product details:', error)
+    throw error
+  }
+}
 
 // Update delivery agent GPS location for an order
-export const updateOrderDeliveryAgentLocation = async (orderId: string | number, location: any) => {
+export const updateOrderDeliveryAgentLocation = async (orderId: string, location: any) => {
   const { error } = await supabase
     .from('orders')
     .update({ delivery_agent_location: location })
@@ -468,7 +592,7 @@ export const updateOrderDeliveryAgentLocation = async (orderId: string | number,
 }
 
 // Fetch delivery agent GPS location for an order
-export const getOrderDeliveryAgentLocation = async (orderId: string | number) => {
+export const getOrderDeliveryAgentLocation = async (orderId: string) => {
   const { data: order, error } = await supabase
     .from('orders')
     .select('delivery_agent_location')

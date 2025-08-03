@@ -10,7 +10,7 @@ export interface LocationState {
 
 // Global location state
 let globalLocationState: LocationState = {
-  selectedCity: "",
+  selectedCity: "All Cities",
   selectedArea: "All Areas",
   selectedLocality: "",
 }
@@ -45,7 +45,7 @@ export function useLocation() {
       try {
         const parsedLocation = JSON.parse(savedLocation)
         globalLocationState = {
-          selectedCity: parsedLocation.selectedCity || "",
+          selectedCity: parsedLocation.selectedCity || "All Cities",
           selectedArea: parsedLocation.selectedArea || "All Areas",
           selectedLocality: parsedLocation.selectedLocality || "",
         }
@@ -90,7 +90,7 @@ export function useLocation() {
 
   const clearLocation = useCallback(() => {
     const newLocation = {
-      selectedCity: globalLocationState.selectedCity,
+      selectedCity: "All Cities",
       selectedArea: "All Areas",
       selectedLocality: "",
     }
@@ -104,10 +104,10 @@ export function useLocation() {
     if (location.selectedArea && location.selectedArea !== "All Areas") {
       return `${location.selectedArea}, ${location.selectedCity}`
     }
-    if (location.selectedCity) {
+    if (location.selectedCity && location.selectedCity !== "All Cities") {
       return location.selectedCity
     }
-    return "Select Location"
+    return "All Cities"
   }, [location])
 
   return {

@@ -87,22 +87,22 @@ export async function PATCH(request: NextRequest) {
     
     console.log("[API] All validations passed, updating seller with ID:", id);
     
-    // Prepare update data
+    // Prepare update data - convert camelCase to snake_case for database
     const updateData: any = {};
     if (name) updateData.name = name;
     if (email) updateData.email = email;
     if (phone) updateData.phone = phone;
-    if (businessName) updateData.businessName = businessName;
-    if (website) updateData.website = website;
-    if (businessAddress) updateData.businessAddress = businessAddress;
-    if (businessCity) updateData.businessCity = businessCity;
-    if (businessState) updateData.businessState = businessState;
-    if (businessPincode) updateData.businessPincode = businessPincode;
-    if (businessArea) updateData.businessArea = businessArea;
-    if (businessLocality) updateData.businessLocality = businessLocality;
-    if (businessDescription) updateData.businessDescription = businessDescription;
-    if (businessImage) updateData.businessImage = businessImage;
-    if (openingHours) updateData.openingHours = openingHours;
+    if (businessName) updateData.business_name = businessName;
+    // Note: website column doesn't exist in the database, so we'll skip it
+    if (businessAddress) updateData.business_address = businessAddress;
+    if (businessCity) updateData.business_city = businessCity;
+    if (businessState) updateData.business_state = businessState;
+    if (businessPincode) updateData.business_pincode = businessPincode;
+    if (businessArea) updateData.business_area = businessArea;
+    if (businessLocality) updateData.business_locality = businessLocality;
+    if (businessDescription) updateData.business_description = businessDescription;
+    if (businessImage) updateData.business_image = businessImage;
+    // Note: opening_hours column doesn't exist in the database, so we'll skip it
     
     console.log("[API] Update data:", updateData);
     
@@ -110,7 +110,7 @@ export async function PATCH(request: NextRequest) {
     const { data: updatedSeller, error } = await supabase
       .from('sellers')
       .update(updateData)
-      .eq('id', Number(id))
+      .eq('id', id)
       .select()
       .single();
     
