@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       const { data: seller, error } = await supabase
         .from('sellers')
         .select('*, products(*)')
-        .eq('id', Number(id))
+        .eq('id', id)
         .single()
       
       if (error || !seller) {
@@ -25,64 +25,70 @@ export async function GET(request: NextRequest) {
       // Get seller stats
       const { data: orderStats, error: orderError } = await supabase
         .from('seller_orders')
-        .select('subtotal, netAmount')
-        .eq('sellerId', Number(id))
+        .select('subtotal, net_amount')
+        .eq('seller_id', id)
 
       const totalOrders = orderStats?.length || 0
       const totalRevenue = orderStats?.reduce((sum, order) => sum + (order.subtotal || 0), 0) || 0
       const averageOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
       const totalProducts = Array.isArray(seller.products) ? seller.products.length : 0
 
-      // Parse subcategories from JSON string
+      // Handle subcategories (now stored as PostgreSQL array, not JSON string)
       let subcategories: any[] = []
-      try {
-        subcategories = seller.subcategories ? JSON.parse(seller.subcategories) : []
-      } catch (e) {
-        console.warn("[DEBUG] Failed to parse subcategories for seller", seller.id, e)
-        subcategories = []
+      if (seller.subcategories) {
+        if (Array.isArray(seller.subcategories)) {
+          subcategories = seller.subcategories
+        } else if (typeof seller.subcategories === 'string') {
+          try {
+            subcategories = JSON.parse(seller.subcategories)
+          } catch (e) {
+            console.warn("[DEBUG] Failed to parse subcategories for seller", seller.id, e)
+            subcategories = []
+          }
+        }
       }
 
       // Format seller data for frontend
       const formattedSeller = {
         id: seller.id,
         name: seller.name || '',
-        businessName: seller.businessName || seller.name || '',
+        businessName: seller.business_name || seller.name || '',
         email: seller.email || '',
         phone: seller.phone || '',
         category: seller.category || '',
         categoryName: getCategoryById(seller.category)?.name || seller.category || '',
         subcategories: subcategories,
-        description: seller.businessDescription || '',
-        image: seller.businessImage || '/placeholder.svg',
-        city: seller.businessCity || '',
-        area: seller.businessArea || '',
-        locality: seller.businessLocality || '',
-        state: seller.businessState || '',
-        pincode: seller.businessPincode || '',
-        address: seller.businessAddress || '',
-        openingHours: seller.openingHours || '',
+        description: seller.business_description || '',
+        image: seller.business_image || '/placeholder.svg',
+        city: seller.business_city || '',
+        area: seller.business_area || '',
+        locality: seller.business_locality || '',
+        state: seller.business_state || '',
+        pincode: seller.business_pincode || '',
+        address: seller.business_address || '',
+        openingHours: seller.opening_hours || '',
         rating: seller.rating ?? 0,
-        reviews: seller.totalReviews ?? 0,
-        deliveryTime: seller.deliveryTime || '30-45 min',
-        isVerified: seller.isVerified ?? false,
-        isPromoted: seller.isPromoted ?? false,
-        isOpen: seller.isOpen ?? true,
+        reviews: seller.total_reviews ?? 0,
+        deliveryTime: seller.delivery_time || '30-45 min',
+        isVerified: seller.is_verified ?? false,
+        isPromoted: seller.is_promoted ?? false,
+        isOpen: seller.is_open ?? true,
         totalProducts,
         totalOrders,
         totalRevenue,
         averageOrderValue,
-        products: Array.isArray(seller.products) ? seller.products.map((product: any) => ({
-          id: product.id,
-          name: product.name || '',
-          description: product.description || '',
-          price: product.price ?? 0,
-          originalPrice: product.originalPrice ?? 0,
-          image: product.image || '/placeholder.svg',
-          category: product.category || '',
-          subcategory: product.subcategory || '',
-          stock: product.stock ?? 0,
-          inStock: product.inStock ?? true
-        })) : []
+                 products: Array.isArray(seller.products) ? seller.products.map((product: any) => ({
+           id: product.id,
+           name: product.title || product.name || '',
+           description: product.description || '',
+           price: product.selling_price ?? 0,
+           originalPrice: product.original_price ?? 0,
+           image: product.image_url || product.image || '/placeholder.svg',
+           category: product.category || '',
+           subcategory: product.subcategory || '',
+           stock: product.quantity_available ?? 0,
+           inStock: product.is_in_stock ?? true
+         })) : []
       }
 
       console.debug("[DEBUG] Single seller profile formatted:", formattedSeller)
@@ -95,7 +101,7 @@ export async function GET(request: NextRequest) {
       .select('*')
 
     if (featured) {
-      query = query.eq('isPromoted', true)
+      query = query.eq('is_promoted', true)
     }
 
     const { data: sellers, error } = await query.limit(limit)
@@ -109,38 +115,45 @@ export async function GET(request: NextRequest) {
 
     // Map to seller profile format expected by the frontend
     const formatted = (sellers || []).map((s) => {
+      // Handle subcategories (now stored as PostgreSQL array, not JSON string)
       let subcategories: any[] = []
-      try {
-        subcategories = s.subcategories ? JSON.parse(s.subcategories) : []
-      } catch (e) {
-        console.warn("[DEBUG] Failed to parse subcategories for seller", s.id, e)
-        subcategories = []
+      if (s.subcategories) {
+        if (Array.isArray(s.subcategories)) {
+          subcategories = s.subcategories
+        } else if (typeof s.subcategories === 'string') {
+          try {
+            subcategories = JSON.parse(s.subcategories)
+          } catch (e) {
+            console.warn("[DEBUG] Failed to parse subcategories for seller", s.id, e)
+            subcategories = []
+          }
+        }
       }
 
       return {
         id: s.id,
         name: s.name || '',
-        businessName: s.businessName || s.name || '',
+        businessName: s.business_name || s.name || '',
         email: s.email || '',
         phone: s.phone || '',
         category: s.category || '',
         categoryName: getCategoryById(s.category)?.name || s.category || '',
         subcategories: subcategories,
-        description: s.businessDescription || '',
-        image: s.businessImage || '/placeholder.svg',
-        city: s.businessCity || '',
-        area: s.businessArea || '',
-        locality: s.businessLocality || '',
-        state: s.businessState || '',
-        pincode: s.businessPincode || '',
-        address: s.businessAddress || '',
-        openingHours: s.openingHours || '',
+        description: s.business_description || '',
+        image: s.business_image || '/placeholder.svg',
+                 city: s.business_city || '',
+         area: s.business_area || '',
+         locality: s.business_locality || '',
+         state: s.business_state || '',
+         pincode: s.business_pincode || '',
+         address: s.business_address || '',
+         openingHours: s.opening_hours || '',
         rating: s.rating ?? 0,
-        reviews: s.totalReviews ?? 0,
-        deliveryTime: s.deliveryTime || "30-45 min",
-        isVerified: s.isVerified ?? false,
-        isPromoted: s.isPromoted ?? false,
-        isOpen: s.isOpen ?? true,
+                 reviews: s.total_reviews ?? 0,
+         deliveryTime: s.delivery_time || "30-45 min",
+         isVerified: s.is_verified ?? false,
+         isPromoted: s.is_promoted ?? false,
+         isOpen: s.is_open ?? true,
         totalProducts: 0, // Will be calculated separately if needed
         totalOrders: 0, // Will be calculated separately if needed
         totalRevenue: 0, // Will be calculated separately if needed

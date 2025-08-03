@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCustomer, createSeller, createDeliveryAgent, storeUserSession, findCustomerByEmail, findSellerByEmail, findDeliveryAgentByEmail, findCustomerByPhone, findSellerByPhone, findDeliveryAgentByPhone } from "@/lib/database";
+import { createCustomer, createSeller, createDeliveryAgent, storeUserSession, findCustomerByEmail, findSellerByEmail, findDeliveryAgentByEmail, findCustomerByPhone, findSellerByPhone, findDeliveryAgentByPhone, testSupabaseConnection } from "@/lib/database";
 import { sendOTP } from "@/lib/utils";
 
 declare global {
@@ -36,6 +36,15 @@ export async function POST(request: NextRequest) {
     if (step === "request_otp") {
       if (!phone) {
         return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
+      }
+      
+      // Test Supabase connection first
+      const isConnected = await testSupabaseConnection();
+      if (!isConnected) {
+        return NextResponse.json({ 
+          error: "Database connection failed", 
+          details: "Please check your Supabase configuration in .env.local file" 
+        }, { status: 500 });
       }
       
       console.log("[DEBUG] Registration request body:", body);
@@ -161,7 +170,7 @@ export async function POST(request: NextRequest) {
             countryCode: regData.countryCode || '+91',
             businessName: regData.businessName,
             category: regData.category,
-            subcategories: regData.subcategories ? JSON.stringify(regData.subcategories) : '[]',
+            subcategories: regData.subcategories || [],
             businessAddress: regData.businessAddress || '',
             businessCity: regData.businessCity,
             businessState: regData.businessState,
@@ -196,7 +205,16 @@ export async function POST(request: NextRequest) {
           console.error('Supabase/DB error message:', (err as any).message);
         }
         console.error('regData at error:', regData);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        
+        // Return the actual error message instead of generic "Internal server error"
+        const errorMessage = err && typeof err === 'object' && 'message' in err 
+          ? (err as any).message 
+          : 'Database connection failed. Please check your Supabase configuration.';
+        
+        return NextResponse.json({ 
+          error: errorMessage,
+          details: "This is likely a Supabase connection issue. Please check your .env.local file."
+        }, { status: 500 });
       }
       // Clean up OTP
       delete globalThis.__signupOtps[phone];
@@ -246,7 +264,7 @@ export async function POST(request: NextRequest) {
         sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60, // 7 days
       });
-      response.cookies.set("userId", user.id.toString(), {
+      response.cookies.set("userId", user.id, {
         httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",

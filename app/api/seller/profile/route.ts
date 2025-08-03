@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       const { data: seller, error } = await supabase
         .from('sellers')
         .select('*')
-        .eq('id', Number(id))
+        .eq('id', id)
         .single();
       
       if (error) {

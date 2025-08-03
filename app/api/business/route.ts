@@ -12,19 +12,25 @@ export async function GET(request: NextRequest) {
       const { data: business, error } = await supabase
         .from('sellers')
         .select('*, products(*)')
-        .eq('id', Number(id))
+        .eq('id', id)
         .single()
       if (error || !business) {
         console.error("[DEBUG] Business not found or error:", error)
         return NextResponse.json({ error: "Business not found" }, { status: 404 })
       }
-      // Parse subcategories from JSON string
+      // Handle subcategories (now stored as PostgreSQL array, not JSON string)
       let subcategories: any[] = []
-      try {
-        subcategories = business.subcategories ? JSON.parse(business.subcategories) : []
-      } catch (e) {
-        console.warn("[DEBUG] Failed to parse subcategories for business", business.id, e)
-        subcategories = []
+      if (business.subcategories) {
+        if (Array.isArray(business.subcategories)) {
+          subcategories = business.subcategories
+        } else if (typeof business.subcategories === 'string') {
+          try {
+            subcategories = JSON.parse(business.subcategories)
+          } catch (e) {
+            console.warn("[DEBUG] Failed to parse subcategories for business", business.id, e)
+            subcategories = []
+          }
+        }
       }
       // Format business data for frontend
       const formattedBusiness = {
@@ -73,7 +79,7 @@ export async function GET(request: NextRequest) {
     const { data: businesses, error } = await supabase
       .from('sellers')
       .select('*, products(*)')
-      .eq('isOpen', true)
+      .eq('is_open', true)
     if (error) {
       console.error("[DEBUG] Failed to fetch businesses:", error)
       return NextResponse.json({ error: "Failed to fetch businesses" }, { status: 500 })
@@ -90,20 +96,20 @@ export async function GET(request: NextRequest) {
       }
       return {
         id: b.id,
-        name: b.businessName || b.name || '',
+        name: b.business_name || b.name || '',
         category: b.category || '',
         subcategories: subcategories,
         categoryName: getCategoryById(b.category)?.name || b.category || '',
         rating: b.rating ?? 0,
-        reviews: b.totalReviews ?? 0,
-        deliveryTime: b.deliveryTime || "30-45 min",
-        image: b.businessImage || "/placeholder.svg",
-        city: b.businessCity || '',
-        area: b.businessArea || '',
-        locality: b.businessLocality || '',
-        promoted: b.isPromoted ?? false,
-        isVerified: b.isVerified ?? false,
-        isOpen: b.isOpen ?? true,
+        reviews: b.total_reviews ?? 0,
+        deliveryTime: b.delivery_time || "30-45 min",
+        image: b.business_image || "/placeholder.svg",
+        city: b.business_city || '',
+        area: b.business_area || '',
+        locality: b.business_locality || '',
+        promoted: b.is_promoted ?? false,
+        isVerified: b.is_verified ?? false,
+        isOpen: b.is_open ?? true,
         products: Array.isArray(b.products) ? b.products.map((product: any) => ({
           id: product.id,
           name: product.name || '',

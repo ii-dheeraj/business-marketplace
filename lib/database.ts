@@ -15,6 +15,27 @@ if (!supabaseAnonKey || supabaseAnonKey === 'your-anon-key') {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+// Test Supabase connection
+export const testSupabaseConnection = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('count')
+      .limit(1)
+    
+    if (error) {
+      console.error('❌ Supabase connection test failed:', error);
+      return false;
+    }
+    
+    console.log('✅ Supabase connection successful');
+    return true;
+  } catch (error) {
+    console.error('❌ Supabase connection test failed:', error);
+    return false;
+  }
+}
+
 // Customer functions
 export const createCustomer = async (data: {
   name: string
@@ -23,13 +44,35 @@ export const createCustomer = async (data: {
   phone?: string
   countryCode?: string
 }) => {
-  const { data: customer, error } = await supabase
-    .from('customers')
-    .insert([{ ...data }])
-    .select()
-    .single()
-  if (error) throw error
-  return customer
+  // Convert camelCase to snake_case for database
+  const customerData = {
+    name: data.name,
+    email: data.email,
+    password: data.password,
+    phone: data.phone,
+    country_code: data.countryCode || '+91'
+  }
+  
+  try {
+    const { data: customer, error } = await supabase
+      .from('customers')
+      .insert([customerData])
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Supabase error creating customer:', error);
+      throw new Error(`Failed to create customer: ${error.message}`);
+    }
+    
+    return customer;
+  } catch (error) {
+    console.error('Exception creating customer:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Database connection failed. Please check your Supabase configuration.');
+  }
 }
 
 export const findCustomerByEmail = async (email: string) => {
@@ -50,7 +93,7 @@ export const findCustomerByEmail = async (email: string) => {
   }
 }
 
-export const findCustomerById = async (id: number) => {
+export const findCustomerById = async (id: string | number) => {
   const { data: customer, error } = await supabase
     .from('customers')
     .select('*')
@@ -79,7 +122,7 @@ export const createSeller = async (data: {
   countryCode?: string
   businessName: string
   category: string
-  subcategories: string
+  subcategories: string[] | string
   businessAddress: string
   businessCity: string
   businessState: string
@@ -90,13 +133,47 @@ export const createSeller = async (data: {
   businessImage?: string
   deliveryTime?: string
 }) => {
-  const { data: seller, error } = await supabase
-    .from('sellers')
-    .insert([{ ...data }])
-    .select()
-    .single()
-  if (error) throw error
-  return seller
+  // Convert camelCase to snake_case for database
+  const sellerData = {
+    name: data.name,
+    email: data.email,
+    password: data.password,
+    phone: data.phone,
+    country_code: data.countryCode || '+91',
+    business_name: data.businessName,
+    category: data.category,
+    subcategories: Array.isArray(data.subcategories) ? data.subcategories : [],
+    business_address: data.businessAddress,
+    business_city: data.businessCity,
+    business_state: data.businessState,
+    business_pincode: data.businessPincode,
+    business_area: data.businessArea,
+    business_locality: data.businessLocality,
+    business_description: data.businessDescription,
+    business_image: data.businessImage,
+    delivery_time: data.deliveryTime
+  }
+  
+  try {
+    const { data: seller, error } = await supabase
+      .from('sellers')
+      .insert([sellerData])
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Supabase error creating seller:', error);
+      throw new Error(`Failed to create seller: ${error.message}`);
+    }
+    
+    return seller;
+  } catch (error) {
+    console.error('Exception creating seller:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Database connection failed. Please check your Supabase configuration.');
+  }
 }
 
 export const findSellerByEmail = async (email: string) => {
@@ -117,7 +194,7 @@ export const findSellerByEmail = async (email: string) => {
   }
 }
 
-export const findSellerById = async (id: number) => {
+export const findSellerById = async (id: string | number) => {
   const { data: seller, error } = await supabase
     .from('sellers')
     .select('*')
@@ -147,9 +224,20 @@ export const createDeliveryAgent = async (data: {
   vehicleNumber: string
   vehicleType: string
 }) => {
+  // Convert camelCase to snake_case for database
+  const agentData = {
+    name: data.name,
+    email: data.email,
+    password: data.password,
+    phone: data.phone,
+    country_code: data.countryCode || '+91',
+    vehicle_number: data.vehicleNumber,
+    vehicle_type: data.vehicleType
+  }
+  
   const { data: agent, error } = await supabase
     .from('delivery_agents')
-    .insert([{ ...data }])
+    .insert([agentData])
     .select()
     .single()
   if (error) throw error
@@ -166,7 +254,7 @@ export const findDeliveryAgentByEmail = async (email: string) => {
   return agent
 }
 
-export const findDeliveryAgentById = async (id: number) => {
+export const findDeliveryAgentById = async (id: string | number) => {
   const { data: agent, error } = await supabase
     .from('delivery_agents')
     .select('*')
@@ -187,7 +275,7 @@ export const findDeliveryAgentByPhone = async (phone: string) => {
 }
 
 // User session storage functions
-export const storeUserSession = async (userType: string, userId: number) => {
+export const storeUserSession = async (userType: string, userId: string | number) => {
   let userData: any = null
 
   if (userType === 'CUSTOMER') {
@@ -215,21 +303,21 @@ export const storeUserSession = async (userType: string, userId: number) => {
   if (userType === 'SELLER') {
     return {
       ...baseUserData,
-      businessName: userData.businessName,
+      businessName: userData.business_name,
       category: userData.category,
       subcategories: userData.subcategories,
-      businessAddress: userData.businessAddress,
-      businessCity: userData.businessCity,
-      businessArea: userData.businessArea,
-      businessLocality: userData.businessLocality,
-      businessDescription: userData.businessDescription,
-      businessImage: userData.businessImage,
-      isVerified: userData.isVerified,
-      isPromoted: userData.isPromoted,
+      businessAddress: userData.business_address,
+      businessCity: userData.business_city,
+      businessArea: userData.business_area,
+      businessLocality: userData.business_locality,
+      businessDescription: userData.business_description,
+      businessImage: userData.business_image,
+      isVerified: userData.is_verified,
+      isPromoted: userData.is_promoted,
       rating: userData.rating,
-      totalReviews: userData.totalReviews,
-      deliveryTime: userData.deliveryTime,
-      isOpen: userData.isOpen,
+      totalReviews: userData.total_reviews,
+      deliveryTime: userData.delivery_time,
+      isOpen: userData.is_open,
     }
   }
 
@@ -237,10 +325,10 @@ export const storeUserSession = async (userType: string, userId: number) => {
   if (userType === 'DELIVERY_AGENT') {
     return {
       ...baseUserData,
-      vehicleNumber: userData.vehicleNumber,
-      vehicleType: userData.vehicleType,
-      isAvailable: userData.isAvailable,
-      currentLocation: userData.currentLocation
+      vehicleNumber: userData.vehicle_number,
+      vehicleType: userData.vehicle_type,
+      isAvailable: userData.is_available,
+      currentLocation: userData.current_location
     }
   }
 
@@ -250,7 +338,7 @@ export const storeUserSession = async (userType: string, userId: number) => {
 
 // Order functions
 export const createOrder = async (data: {
-  customerId: number
+  customerId: string | number
   customerName: string
   customerPhone: string
   customerAddress: string
@@ -271,22 +359,22 @@ export const createOrder = async (data: {
   const { data: order, error } = await supabase
     .from('orders')
     .insert([{
-      orderNumber: 'temp',
-      customerId: data.customerId,
-      customerName: data.customerName,
-      customerPhone: data.customerPhone,
-      customerAddress: data.customerAddress,
-      customerCity: data.customerCity,
-      customerArea: data.customerArea,
-      customerLocality: data.customerLocality,
+      order_number: 'temp',
+      customer_id: data.customerId,
+      customer_name: data.customerName,
+      customer_phone: data.customerPhone,
+      customer_address: data.customerAddress,
+      customer_city: data.customerCity,
+      customer_area: data.customerArea,
+      customer_locality: data.customerLocality,
       subtotal: data.subtotal,
-      deliveryFee: data.deliveryFee,
-      taxAmount: data.taxAmount,
-      totalAmount: data.totalAmount,
-      paymentMethod: data.paymentMethod,
-      deliveryInstructions: data.deliveryInstructions,
+      delivery_fee: data.deliveryFee,
+      tax_amount: data.taxAmount,
+      total_amount: data.totalAmount,
+      payment_method: data.paymentMethod,
+      delivery_instructions: data.deliveryInstructions,
       parcel_otp: data.deliveryOTP, // Store the delivery OTP
-      orderStatus: 'PENDING', // Changed from 'CONFIRMED' to 'PENDING'
+      order_status: 'PENDING', // Changed from 'CONFIRMED' to 'PENDING'
     }])
     .select()
     .single()
@@ -297,7 +385,7 @@ export const createOrder = async (data: {
   // Step 2: Update orderNumber to be the running id
   const { data: updatedOrder, error: updateError } = await supabase
     .from('orders')
-    .update({ orderNumber: order.id.toString() })
+    .update({ order_number: order.id.toString() })
     .eq('id', order.id)
     .select()
     .single()
@@ -305,22 +393,22 @@ export const createOrder = async (data: {
   // Insert order items
   for (const item of data.items) {
     await supabase.from('order_items').insert({
-      orderId: order.id,
-      productId: item.productId,
+      order_id: order.id,
+      product_id: item.productId,
       quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      totalPrice: item.totalPrice,
-      productName: item.productName,
-      productImage: item.productImage,
-      productCategory: item.productCategory
+      unit_price: item.unitPrice,
+      total_price: item.totalPrice,
+      product_name: item.productName,
+      product_image: item.productImage,
+      product_category: item.productCategory
     })
   }
   return updatedOrder
 }
 
 export const createSellerOrder = async (data: {
-  orderId: number
-  sellerId: number
+  orderId: string | number
+  sellerId: string | number
   items: any[]
   subtotal: number
   commission: number
@@ -329,12 +417,12 @@ export const createSellerOrder = async (data: {
   const { data: sellerOrder, error } = await supabase
     .from('seller_orders')
     .insert([{
-      orderId: data.orderId,
-      sellerId: data.sellerId,
+      order_id: data.orderId,
+      seller_id: data.sellerId,
       items: data.items,
       subtotal: data.subtotal,
       commission: data.commission,
-      netAmount: data.netAmount
+      net_amount: data.netAmount
     }])
     .select()
     .single()
@@ -343,8 +431,8 @@ export const createSellerOrder = async (data: {
 }
 
 export const createPayment = async (data: {
-  orderId: number
-  userId: number
+  orderId: string | number
+  userId: string | number
   amount: number
   paymentMethod: string
   transactionId?: string
@@ -354,12 +442,12 @@ export const createPayment = async (data: {
   const { data: payment, error } = await supabase
     .from('payments')
     .insert([{
-      paymentId,
-      orderId: data.orderId,
-      userId: data.userId,
+      payment_id: paymentId,
+      order_id: data.orderId,
+      customer_id: data.userId,
       amount: data.amount,
-      paymentMethod: data.paymentMethod,
-      transactionId: data.transactionId,
+      payment_method: data.paymentMethod,
+      transaction_id: data.transactionId,
       gateway: data.gateway
     }])
     .select()
@@ -371,7 +459,7 @@ export const createPayment = async (data: {
 
 
 // Update delivery agent GPS location for an order
-export const updateOrderDeliveryAgentLocation = async (orderId: number, location: any) => {
+export const updateOrderDeliveryAgentLocation = async (orderId: string | number, location: any) => {
   const { error } = await supabase
     .from('orders')
     .update({ delivery_agent_location: location })
@@ -380,7 +468,7 @@ export const updateOrderDeliveryAgentLocation = async (orderId: number, location
 }
 
 // Fetch delivery agent GPS location for an order
-export const getOrderDeliveryAgentLocation = async (orderId: number) => {
+export const getOrderDeliveryAgentLocation = async (orderId: string | number) => {
   const { data: order, error } = await supabase
     .from('orders')
     .select('delivery_agent_location')

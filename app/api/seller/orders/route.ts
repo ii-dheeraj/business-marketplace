@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const { data: seller, error: sellerError } = await supabase
       .from('sellers')
       .select('id, name, email')
-      .eq('id', Number(sellerId))
+      .eq('id', sellerId)
       .single()
     
     if (sellerError || !seller) {
@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
     // Check if there are any seller_orders for this seller
     const { data: basicSellerOrders, error: basicError } = await supabase
       .from('seller_orders')
-      .select('id, orderId, sellerId, status, created_at')
-      .eq('sellerId', Number(sellerId))
+      .select('id, order_id, seller_id, status, created_at')
+      .eq('seller_id', sellerId)
       .order('created_at', { ascending: false })
     
     if (basicError) {
@@ -64,36 +64,36 @@ export async function GET(request: NextRequest) {
       .from('seller_orders')
       .select(`
         id, 
-        orderId, 
-        sellerId, 
+        order_id, 
+        seller_id, 
         status, 
         items, 
         subtotal, 
         commission, 
-        netAmount, 
+        net_amount, 
         created_at, 
         updated_at,
         orders!inner(
           id,
-          orderNumber,
-          orderStatus,
-          customerName,
-          customerPhone,
-          customerAddress,
-          totalAmount,
-          paymentStatus,
-          paymentMethod,
+          order_number,
+          order_status,
+          customer_name,
+          customer_phone,
+          customer_address,
+          total_amount,
+          payment_status,
+          payment_method,
+          delivery_agent_id,
           created_at,
           updated_at,
           parcel_otp,
-          estimatedDeliveryTime,
-          actualDeliveryTime,
-          deliveryInstructions,
-          order_items(id, productName, quantity, unitPrice, totalPrice, productId, productImage),
-          deliveryAgent:delivery_agents(id, name, phone, vehicleNumber)
+          estimated_delivery_time,
+          actual_delivery_time,
+          delivery_instructions,
+          order_items(id, product_name, quantity, unit_price, total_price, product_id, product_image)
         )
       `, { count: 'exact' })
-      .eq('sellerId', Number(sellerId))
+      .eq('seller_id', sellerId)
       .order('created_at', { ascending: false })
       .range(from, to)
     
@@ -111,31 +111,31 @@ export async function GET(request: NextRequest) {
       return {
         // Seller order fields
         id: sellerOrder.id,
-        orderId: sellerOrder.orderId,
-        sellerId: sellerOrder.sellerId,
+        orderId: sellerOrder.order_id,
+        sellerId: sellerOrder.seller_id,
         status: sellerOrder.status,
         items: sellerOrder.items,
         subtotal: sellerOrder.subtotal,
         commission: sellerOrder.commission,
-        netAmount: sellerOrder.netAmount,
+        netAmount: sellerOrder.net_amount,
         created_at: sellerOrder.created_at,
         updated_at: sellerOrder.updated_at,
         
         // Order fields
-        orderNumber: order?.orderNumber,
-        orderStatus: order?.orderStatus,
-        customerName: order?.customerName,
-        customerPhone: order?.customerPhone,
-        customerAddress: order?.customerAddress,
-        totalAmount: order?.totalAmount,
-        paymentStatus: order?.paymentStatus,
-        paymentMethod: order?.paymentMethod,
+        orderNumber: order?.order_number,
+        orderStatus: order?.order_status,
+        customerName: order?.customer_name,
+        customerPhone: order?.customer_phone,
+        customerAddress: order?.customer_address,
+        totalAmount: order?.total_amount,
+        paymentStatus: order?.payment_status,
+        paymentMethod: order?.payment_method,
+        deliveryAgentId: order?.delivery_agent_id,
         parcel_otp: order?.parcel_otp,
-        estimatedDeliveryTime: order?.estimatedDeliveryTime,
-        actualDeliveryTime: order?.actualDeliveryTime,
-        deliveryInstructions: order?.deliveryInstructions,
-        order_items: order?.order_items || [],
-        deliveryAgent: order?.deliveryAgent
+        estimatedDeliveryTime: order?.estimated_delivery_time,
+        actualDeliveryTime: order?.actual_delivery_time,
+        deliveryInstructions: order?.delivery_instructions,
+        order_items: order?.order_items || []
       }
     }) || []
     

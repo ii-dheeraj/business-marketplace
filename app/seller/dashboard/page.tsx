@@ -53,6 +53,9 @@ import { indianStates, indianStateCityMap } from "@/utils/indian-location-data";
 export default function SellerDashboard() {
   const [sellerInfo, setSellerInfo] = useState<any>(null)
   const [activeTab, setActiveTab] = useState("products")
+  const [categories, setCategories] = useState<any[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [isLoadingOrders, setIsLoadingOrders] = useState(false)
@@ -120,12 +123,30 @@ export default function SellerDashboard() {
   };
 
   // Optimized data fetching with loading states
+  const fetchCategories = async () => {
+    setIsLoadingCategories(true)
+    try {
+      const res = await fetch('/api/categories?active=true')
+      const data = await res.json()
+      if (res.ok) {
+        setCategories(data.categories || [])
+      } else {
+        console.error("[SellerDashboard] Failed to fetch categories:", data.error)
+      }
+    } catch (error) {
+      console.error("[SellerDashboard] Error fetching categories:", error)
+    } finally {
+      setIsLoadingCategories(false)
+    }
+  }
+
   const fetchProducts = async (page = 1) => {
     if (!sellerInfo) return
     setIsLoadingProducts(true)
     try {
-      const apiUrl = `/api/product?sellerId=${sellerInfo.id}&page=${page}&limit=10`;
-      console.log("[SellerDashboard] Fetching products for sellerId:", sellerInfo.id, "URL:", apiUrl);
+      const categoryFilter = selectedCategory !== "all" ? `&category=${selectedCategory}` : ""
+      const apiUrl = `/api/product?sellerId=${sellerInfo.id}&page=${page}&limit=10${categoryFilter}`;
+      console.log("[SellerDashboard] Fetching products for sellerId:", sellerInfo.id, "category:", selectedCategory, "URL:", apiUrl);
       const res = await fetch(apiUrl)
       const data = await res.json()
       console.log("[SellerDashboard] Products fetched:", data.products)
@@ -174,6 +195,10 @@ export default function SellerDashboard() {
 
 
   // No longer needed since we're using data URLs instead of blob URLs
+
+  useEffect(() => {
+    fetchCategories() // Fetch categories when component mounts
+  }, [])
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -294,6 +319,11 @@ export default function SellerDashboard() {
     } else if (tab === "orders" && orders.length === 0) {
       fetchOrders(1)
     }
+  }
+
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category)
+    fetchProducts(1) // Reset to first page when category changes
   }
 
 
@@ -549,6 +579,47 @@ export default function SellerDashboard() {
                   Add Product
                 </Button>
               </Link>
+            </div>
+
+            {/* Category Filter */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-medium text-gray-700">Filter by Category:</Label>
+                {isLoadingCategories && (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+                )}
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedCategory === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleCategoryChange("all")}
+                  className="text-xs"
+                >
+                  📦 All Products
+                </Button>
+                
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={selectedCategory === category.id ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleCategoryChange(category.id)}
+                    className="text-xs"
+                  >
+                    {category.icon} {category.name}
+                  </Button>
+                ))}
+              </div>
+              
+              {selectedCategory !== "all" && (
+                <div className="text-sm text-gray-600">
+                  Showing products in: <span className="font-medium">
+                    {categories.find(c => c.id === selectedCategory)?.name || selectedCategory}
+                  </span>
+                </div>
+              )}
             </div>
 
             <Card>

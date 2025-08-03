@@ -14,7 +14,6 @@ import { ArrowLeft, Upload, X, Save, Eye, Plus, Tag, Image as ImageIcon, Setting
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getCookie } from "@/lib/utils"
-import { CATEGORIES } from "@/utils/category-data"
 
 interface ProductVariant {
   id: string
@@ -98,6 +97,8 @@ const UNITS = ['pcs', 'kg', 'g', 'l', 'ml', 'm', 'cm', 'custom']
 
 export default function AddProduct() {
   const [sellerInfo, setSellerInfo] = useState<any>(null)
+  const [categories, setCategories] = useState<any[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
   const router = useRouter()
 
   const [productData, setProductData] = useState({
@@ -161,6 +162,23 @@ export default function AddProduct() {
     setImages((prev) => prev.filter((image) => image.id !== imageId))
   }
 
+  const fetchCategories = async () => {
+    setIsLoadingCategories(true)
+    try {
+      const res = await fetch('/api/categories?active=true')
+      const data = await res.json()
+      if (res.ok) {
+        setCategories(data.categories || [])
+      } else {
+        console.error("[AddProduct] Failed to fetch categories:", data.error)
+      }
+    } catch (error) {
+      console.error("[AddProduct] Error fetching categories:", error)
+    } finally {
+      setIsLoadingCategories(false)
+    }
+  }
+
   useEffect(() => {
     // Check seller authentication
     const userInfoCookie = getCookie("userInfo")
@@ -169,6 +187,9 @@ export default function AddProduct() {
     } else {
       setSellerInfo(JSON.parse(userInfoCookie))
     }
+    
+    // Fetch categories
+    fetchCategories()
   }, [router])
 
   // Auto-calculate discount percentage
@@ -581,11 +602,18 @@ export default function AddProduct() {
                   onChange={(e) => handleInputChange("category", e.target.value)}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   required
+                  disabled={isLoadingCategories}
                 >
                   <option value="">— Select Category —</option>
-                  {CATEGORIES.map((category) => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
+                  {isLoadingCategories ? (
+                    <option value="" disabled>Loading categories...</option>
+                  ) : (
+                    categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.icon} {category.name}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 

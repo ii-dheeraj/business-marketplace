@@ -69,49 +69,48 @@ export async function POST(request: NextRequest) {
       minOrderAmount: 0
     }
 
-    // Prepare product data with flexible defaults
+    // Prepare product data for the new schema structure
     const productData = {
-      name,
+      seller_id: sellerId,
+      title: name,
       description: description || "",
-      price: price ? Number(price) : 0, // Allow 0 for negotiable prices
-      originalPrice: originalPrice ? Number(originalPrice) : null,
-      image: images.length > 0 ? images[0] : image, // Use first image from array or fallback to single image
-      sellerId: Number(sellerId),
+      type: productType,
       category: category || "",
-      stock: productType === 'physical' ? (stock ? Number(stock) : 0) : 0,
-      inStock: productType === 'physical' ? ((stock ? Number(stock) : 0) > 0) : true,
-      isActive: true,
-      
-      // New comprehensive fields with defaults
-      productType,
-      tags: Array.isArray(tags) ? tags : [],
-      images: Array.isArray(images) ? images : [],
-      discountPercent: discountPercent ? Number(discountPercent) : null,
-      sku: sku || "",
-      unit,
-      customUnit: customUnit || "",
-      downloadUrl: downloadUrl || "",
-      accessInstructions: accessInstructions || "",
-      serviceName: serviceName || "",
-      duration: duration ? Number(duration) : null,
-      calendlyLink: calendlyLink || "",
-      location: location || "",
-      hours: hours || "",
-      instructions: instructions || "",
-      contactEmail: contactEmail || "",
-      contactPhone: contactPhone || "",
-      keyword: keyword || "",
+      subcategory: "",
       slug: slug || "",
-      seoTags: Array.isArray(seoTags) ? seoTags : [],
-      seoDescription: seoDescription || "",
-      features: Array.isArray(features) ? features : [],
-      seoScore: Number(seoScore),
-      variants: Array.isArray(variants) ? variants : [],
-      
-      // Delivery fields (only for physical products)
-      ...deliveryFields
+      tags: Array.isArray(tags) ? tags : [],
+      keywords: Array.isArray(seoTags) ? seoTags : [],
+      seo_description: seoDescription || "",
+      is_active: true,
+      is_featured: false,
+      is_promoted: false
     }
-
+    
+    // Prepare pricing data
+    const pricingData = {
+      original_price: originalPrice ? Number(originalPrice) : null,
+      selling_price: price ? Number(price) : 0,
+      discount_percent: discountPercent ? Number(discountPercent) : null,
+      unit_label: unit || 'piece',
+      custom_unit: customUnit || "",
+      sku: sku || "",
+      quantity_available: productType === 'physical' ? (stock ? Number(stock) : 0) : 0,
+      min_order_quantity: 1,
+      max_order_quantity: null,
+      is_in_stock: productType === 'physical' ? ((stock ? Number(stock) : 0) > 0) : true,
+      low_stock_threshold: 5
+    }
+    
+    // Prepare image data
+    const imageUrls = Array.isArray(images) && images.length > 0 ? images : [image].filter(Boolean)
+    const imageData = imageUrls.map((url, index) => ({
+      image_url: url,
+      alt_text: name,
+      is_primary: index === 0,
+      sort_order: index
+    }))
+    
+    // Insert product first
     const { data: product, error: createError } = await supabase
       .from('products')
       .insert([productData])
@@ -121,6 +120,36 @@ export async function POST(request: NextRequest) {
     if (createError) {
       console.error("[PRODUCT API] Database error:", createError)
       return NextResponse.json({ error: createError.message }, { status: 500 })
+    }
+    
+    // Insert pricing data
+    if (product) {
+      const { error: pricingError } = await supabase
+        .from('product_pricing')
+        .insert([{
+          product_id: product.id,
+          ...pricingData
+        }])
+      
+      if (pricingError) {
+        console.error("[PRODUCT API] Pricing insert error:", pricingError)
+        // Continue anyway, pricing is optional
+      }
+      
+      // Insert image data
+      if (imageData.length > 0) {
+        const { error: imageError } = await supabase
+          .from('product_images')
+          .insert(imageData.map(img => ({
+            product_id: product.id,
+            ...img
+          })))
+        
+        if (imageError) {
+          console.error("[PRODUCT API] Image insert error:", imageError)
+          // Continue anyway, images are optional
+        }
+      }
     }
     
     // Send real-time notification to seller
@@ -152,6 +181,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const sellerId = searchParams.get("sellerId")
+  const category = searchParams.get("category")
   const page = parseInt(searchParams.get("page") || "1")
   const limit = parseInt(searchParams.get("limit") || "20")
   const from = (page - 1) * limit
@@ -160,25 +190,92 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('products')
       .select(`
-        id, name, description, price, originalPrice, image, category, subcategory, stock, inStock, isActive, sellerId, created_at, updated_at,
-        productType, tags, images, discountPercent, sku, unit, customUnit,
-        downloadUrl, accessInstructions, serviceName, duration, calendlyLink,
-        location, hours, instructions, contactEmail, contactPhone,
-        keyword, slug, seoTags, seoDescription, features, seoScore,
-        isDeliveryEnabled, deliveryRadius, deliveryFee, minOrderAmount, variants
+        id, 
+        seller_id, 
+        title, 
+        description, 
+        type, 
+        category, 
+        subcategory, 
+        slug, 
+        tags, 
+        keywords, 
+        seo_description, 
+        is_active, 
+        is_featured, 
+        is_promoted, 
+        created_at, 
+        updated_at,
+        product_pricing(
+          original_price,
+          selling_price,
+          discount_percent,
+          unit_label,
+          custom_unit,
+          sku,
+          quantity_available,
+          min_order_quantity,
+          max_order_quantity,
+          is_in_stock,
+          low_stock_threshold
+        ),
+        product_images(
+          image_url,
+          alt_text,
+          is_primary,
+          sort_order
+        )
       `, { count: 'exact' })
-      .eq('isActive', true)
+      .eq('is_active', true)
       .order('created_at', { ascending: false })
       .range(from, to)
     if (sellerId) {
-      query = query.eq('sellerId', Number(sellerId))
+      query = query.eq('seller_id', sellerId)
+    }
+    if (category) {
+      query = query.eq('category', category)
     }
     const { data: products, error, count } = await query
     if (error) {
+      console.error("[PRODUCT API] Error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+    
+    // Transform the data to match frontend expectations
+    const transformedProducts = products?.map(product => {
+      const pricing = product.product_pricing?.[0] || {}
+      const primaryImage = product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
+      
+      return {
+        id: product.id,
+        name: product.title,
+        description: product.description,
+        category: product.category,
+        subcategory: product.subcategory,
+        price: pricing.selling_price || 0,
+        originalPrice: pricing.original_price || 0,
+        stock: pricing.quantity_available || 0,
+        inStock: pricing.is_in_stock || false,
+        image: primaryImage?.image_url || '/placeholder.svg',
+        sellerId: product.seller_id,
+        productType: product.type,
+        sku: pricing.sku,
+        unit: pricing.unit_label,
+        customUnit: pricing.custom_unit,
+        isActive: product.is_active,
+        isFeatured: product.is_featured,
+        isPromoted: product.is_promoted,
+        slug: product.slug,
+        tags: product.tags || [],
+        keywords: product.keywords || [],
+        seoDescription: product.seo_description,
+        created_at: product.created_at,
+        updated_at: product.updated_at
+      }
+    }) || []
+    
     return NextResponse.json({ 
-      products,
+      products: transformedProducts,
       pagination: {
         page,
         limit,
@@ -188,7 +285,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error("[API] Error fetching products for sellerId:", sellerId, error)
-    return NextResponse.json({ error: "Internal server error", details: error?.message }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 })
   }
 }
 

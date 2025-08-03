@@ -32,14 +32,14 @@ export async function POST(request: NextRequest) {
         console.debug('[DEBUG] Looking up product', item.productId)
         const { data: product, error } = await supabase
           .from('products')
-          .select('*, sellerId')
-          .eq('id', Number(item.productId))
+          .select('*, seller_id')
+          .eq('id', item.productId)
           .single()
         console.debug('[DEBUG] Supabase product lookup result:', { product, error })
         if (error || !product) {
           return NextResponse.json({ error: `Product ${item.productId} not found` }, { status: 404 })
         }
-        const sellerId = product.sellerId
+        const sellerId = product.seller_id
         if (!itemsBySeller.has(sellerId)) {
           itemsBySeller.set(sellerId, [])
         }
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
         // Update order payment status
         await supabase
           .from('orders')
-          .update({ paymentStatus: paymentStatus })
+          .update({ payment_status: paymentStatus })
           .eq('id', order.id)
       } catch (err) {
         console.error('[ERROR] Payment creation failed:', JSON.stringify(err, null, 2))
@@ -335,7 +335,7 @@ export async function GET(request: NextRequest) {
             deliveryInstructions,
             order_items(id, productName, quantity, totalPrice),
             seller_orders(id, status),
-            deliveryAgent:delivery_agents(id, name, phone, vehicleNumber)
+            delivery_agent_id
           `)
           .eq('customerId', Number(customerId))
           .order('created_at', { ascending: false })
@@ -368,14 +368,14 @@ export async function GET(request: NextRequest) {
     if (deliveryAgentId || status) {
       let query = supabase
         .from('orders')
-        .select('id, orderNumber, orderStatus, customerName, customerPhone, totalAmount, paymentStatus, paymentMethod, deliveryAgentId, created_at, updated_at')
+        .select('id, order_number, order_status, customer_name, customer_phone, total_amount, payment_status, payment_method, delivery_agent_id, created_at, updated_at')
       
       // Apply filters
       if (deliveryAgentId) {
-        query = query.eq('deliveryAgentId', Number(deliveryAgentId))
+        query = query.eq('delivery_agent_id', deliveryAgentId)
       }
       if (status) {
-        query = query.eq('orderStatus', status)
+        query = query.eq('order_status', status)
       }
       
       // Apply pagination and ordering
@@ -393,10 +393,10 @@ export async function GET(request: NextRequest) {
         .select('*', { count: 'exact', head: true })
       
       if (deliveryAgentId) {
-        countQuery = countQuery.eq('deliveryAgentId', Number(deliveryAgentId))
+        countQuery = countQuery.eq('delivery_agent_id', deliveryAgentId)
       }
       if (status) {
-        countQuery = countQuery.eq('orderStatus', status)
+        countQuery = countQuery.eq('order_status', status)
       }
       
       const { count } = await countQuery
@@ -414,7 +414,7 @@ export async function GET(request: NextRequest) {
     // For admin/seller dashboard - optimized with pagination
     const { data: orders, error } = await supabase
       .from('orders')
-      .select('id, orderNumber, orderStatus, customerName, customerPhone, totalAmount, paymentStatus, paymentMethod, created_at, updated_at, order_items(id, productName, quantity, unitPrice, totalPrice)')
+      .select('id, order_number, order_status, customer_name, customer_phone, total_amount, payment_status, payment_method, created_at, updated_at, order_items(id, product_name, quantity, unit_price, total_price)')
       .order('created_at', { ascending: false })
       .range(skip, skip + limit - 1)
     if (error) {
